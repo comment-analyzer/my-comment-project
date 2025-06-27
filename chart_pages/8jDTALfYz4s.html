@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>コメントグラフ - 8jDTALfYz4s</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
+    .video-container { position: relative; padding-bottom: 56.25%; height: 0; margin-bottom: 20px; }
+    .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    canvas { background: white; border-radius: 8px; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h2>📈 コメントの盛り上がり</h2>
+  <div class="video-container">
+    <iframe src="https://www.youtube.com/embed/8jDTALfYz4s" frameborder="0" allowfullscreen></iframe>
+  </div>
+  <canvas id="commentChart"></canvas>
+
+  <script>
+    fetch("../chart_data/8jDTALfYz4s_chart.json")
+      .then(response => response.json())
+      .then(data => {
+        // JSONが [{ time: 0, count: 16 }, ...] 形式の場合に対応
+        const labels = data.map(item => item.time);
+        const counts = data.map(item => item.count);
+
+        const ctx = document.getElementById("commentChart").getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "コメント数（10秒ごと）",
+              data: counts,
+              borderColor: "#42A5F5",
+              backgroundColor: "rgba(66,165,245,0.2)",
+              fill: true,
+              tension: 0.3,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { title: { display: true, text: "経過時間（秒）" } },
+              y: { beginAtZero: true, title: { display: true, text: "コメント数" } }
+            }
+          }
+        });
+      });
+  </script>
+</body>
+</html>
