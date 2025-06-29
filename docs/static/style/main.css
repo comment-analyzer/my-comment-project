@@ -1,6 +1,21 @@
+:root {
+  --primary-color: #007bff;
+  --secondary-color: #6c757d;
+  --accent-color: #28a745;
+  --background-color: #f8f9fa;
+  --surface-color: #ffffff;
+  --text-color: #343a40;
+  --light-text-color: #6c757d;
+  --border-color: #dee2e6;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+}
+
 body {
-  font-family: sans-serif;
-  padding: 1em;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 20px;
+  line-height: 1.6;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 .creator-card {
@@ -13,32 +28,39 @@ body {
   border-collapse: collapse;
   margin-top: 1em;
   overflow-x: auto;
-  table-layout: fixed; /* 列幅固定のため追加 */
+  table-layout: fixed;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--surface-color);
 }
 
 #creators-table th,
 #creators-table td {
-  padding: 10px;
-  text-align: center;
-  border: 1px solid #ccc;
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
 }
 
 #creators-table th {
-  background-color: #f4f4f4;
+  background-color: var(--background-color);
   font-weight: bold;
+  color: var(--text-color);
+  text-transform: uppercase;
 }
 
 #creators-table tr:nth-child(even) {
-  background-color: #fafafa;
+  background-color: var(--background-color);
 }
 
 #creators-table tr:hover {
-  background-color: #eef;
+  background-color: var(--primary-color-light);
+  cursor: pointer;
 }
 
 #creators-table a {
   text-decoration: none;
-  color: #0077cc;
+  color: var(--primary-color);
 }
 
 #creators-table a:hover {
@@ -77,181 +99,56 @@ body {
 }
 
 .modal-content {
-  background-color: #fff;
+  background-color: var(--surface-color);
   margin: auto;
-  padding: 1em;
-  border: 1px solid #888;
+  padding: 2em;
+  border: none;
   width: 90%;
-  max-width: 800px;
+  max-width: 900px;
   position: relative;
-  border-radius: 8px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px var(--shadow-color);
 }
 
 #modal-close {
-  color: #aaa;
+  color: var(--light-text-color);
   position: absolute;
-  top: 8px;
-  right: 16px;
-  font-size: 28px;
+  top: 15px;
+  right: 25px;
+  font-size: 30px;
   cursor: pointer;
+  transition: color 0.3s ease;
 }
 
 #modal-close:hover {
-  color: #000;
-}
-
-/* video-table は creator_page 用 */
-#video-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1em;
-}
-
-#video-table th,
-#video-table td {
-  padding: 8px;
-  text-align: center;
-  border: 1px solid #ccc;
-}
-
-#video-table th {
-  background-color: #f4f4f4;
-  cursor: pointer;
+  color: var(--text-color);
 }
 
 /* グループ切り替えボタン */
 #group-filter {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   text-align: center;
 }
 
 .group-btn {
-  margin: 0 5px;
-  padding: 6px 12px;
-  border: none;
-  background-color: #ddd;
-  border-radius: 4px;
+  margin: 0 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--primary-color);
+  background-color: var(--surface-color);
+  color: var(--primary-color);
+  border-radius: 20px;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .group-btn.active {
-  background-color: #3498db;
-  color: white;
+  background-color: var(--primary-color);
+  color: var(--surface-color);
+  box-shadow: 0 2px 5px rgba(0, 123, 255, 0.3);
 }
 
-/* ソート矢印 */
-#creators-table th.sort-asc::after {
-  content: " ▲";
-  font-size: 0.9em;
-  color: #333;
-}
-
-#creators-table th.sort-desc::after {
-  content: " ▼";
-  font-size: 0.9em;
-  color: #333;
-}
-
-#video-table th.sort-asc::after {
-  content: " ▲" !important;
-  font-size: 0.9em !important;
-  color: #333 !important;
-  display: inline !important;
-  margin-left: 4px;
-}
-
-#video-table th.sort-desc::after {
-  content: " ▼" !important;
-  font-size: 0.9em !important;
-  color: #333 !important;
-  display: inline !important;
-  margin-left: 4px;
-}
-
-.video-table-wrapper {
-  overflow-x: auto;
-  width: 100%;
-}
-
-#video-table {
-  min-width: 800px;
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1em;
-}
-
-/* タイトル列（横スクロール可） */
-#video-table td.title-cell,
-#video-table th.title-cell {
-  width: 8em;
-  min-width: 8em;
-  max-width: 8em;
-  overflow: hidden;
-}
-
-.title-scroll {
-  display: block;
-  white-space: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-/* スクロールバーカスタマイズ */
-.title-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.title-scroll::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 2px;
-}
-
-/* モバイル向け */
-@media screen and (max-width: 600px) {
-  body {
-    font-size: 14px;
-    padding: 0.5em;
-  }
-
-  #video-table th,
-  #video-table td {
-    padding: 6px;
-    font-size: 13px;
-  }
-
-  .modal-content {
-    width: 95%;
-    max-width: none;
-  }
-
-  .group-btn {
-    padding: 5px 10px;
-    font-size: 13px;
-  }
-
-  .title-scroll {
-    max-width: 100%;
-  }
-}
-
-button,
-a {
-  touch-action: manipulation;
-}
-
-button {
-  padding: 8px 12px;
-  font-size: 14px;
-}
-
-
-/* PC向け：12文字分に拡張 */
-@media screen and (min-width: 768px) {
-  #creators-table th.name-cell,
-  #creators-table td.name-cell,
-  .fixed-name-cell {
-    width: 12em;
-    min-width: 12em;
-    max-width: 12em;
-  }
+.group-btn:hover:not(.active) {
+  background-color: var(--primary-color-light);
+  color: var(--primary-color-dark);
+  border-color: var(--primary-color-dark);
 }

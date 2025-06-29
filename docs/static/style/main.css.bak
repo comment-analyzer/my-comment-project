@@ -1,0 +1,275 @@
+body {
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 20px;
+  line-height: 1.6;
+  background-color: #f4f7f6;
+}
+
+.creator-card {
+  margin-bottom: 1.5em;
+}
+
+/* テーブルのスタイル（index.html） */
+#creators-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  overflow-x: auto;
+  table-layout: fixed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#creators-table th,
+#creators-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+#creators-table th {
+  background-color: #eef2f3;
+  font-weight: bold;
+  color: #333;
+  text-transform: uppercase;
+}
+
+#creators-table tr:nth-child(even) {
+  background-color: #f8fbfb;
+}
+
+#creators-table tr:hover {
+  background-color: #e0f2f7;
+  cursor: pointer;
+}
+
+#creators-table a {
+  text-decoration: none;
+  color: #0077cc;
+}
+
+#creators-table a:hover {
+  text-decoration: underline;
+}
+
+/* 配信者名列（固定幅） */
+#creators-table th.name-cell,
+#creators-table td.name-cell {
+  width: 6em;
+  min-width: 6em;
+  max-width: 6em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fixed-name-cell {
+  white-space: nowrap;
+  overflow-x: auto;
+  display: block;
+}
+
+/* モーダル基本 */
+#modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  padding-top: 60px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: auto;
+  padding: 1em;
+  border: 1px solid #888;
+  width: 90%;
+  max-width: 800px;
+  position: relative;
+  border-radius: 8px;
+}
+
+#modal-close {
+  color: #aaa;
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+#modal-close:hover {
+  color: #000;
+}
+
+/* video-table は creator_page 用 */
+#video-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+}
+
+#video-table th,
+#video-table td {
+  padding: 8px;
+  text-align: center;
+  border: 1px solid #ccc;
+}
+
+#video-table th {
+  background-color: #f4f4f4;
+  cursor: pointer;
+}
+
+/* グループ切り替えボタン */
+#group-filter {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.group-btn {
+  margin: 0 5px;
+  padding: 6px 12px;
+  border: none;
+  background-color: #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.group-btn.active {
+  background-color: #3498db;
+  color: white;
+}
+
+/* ソート矢印 */
+#creators-table th.sort-asc::after {
+  content: " ▲";
+  font-size: 0.9em;
+  color: #333;
+}
+
+#creators-table th.sort-desc::after {
+  content: " ▼";
+  font-size: 0.9em;
+  color: #333;
+}
+
+#video-table th.sort-asc::after {
+  content: " ▲" !important;
+  font-size: 0.9em !important;
+  color: #333 !important;
+  display: inline !important;
+  margin-left: 4px;
+}
+
+#video-table th.sort-desc::after {
+  content: " ▼" !important;
+  font-size: 0.9em !important;
+  color: #333 !important;
+  display: inline !important;
+  margin-left: 4px;
+}
+
+.video-table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+#video-table {
+  min-width: 800px;
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+}
+
+/* タイトル列（横スクロール可） */
+#video-table td.title-cell,
+#video-table th.title-cell {
+  width: 8em;
+  min-width: 8em;
+  max-width: 8em;
+  overflow: hidden;
+}
+
+.title-scroll {
+  display: block;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* スクロールバーカスタマイズ */
+.title-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.title-scroll::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 2px;
+}
+
+/* モバイル向け */
+@media screen and (max-width: 600px) {
+  body {
+    font-size: 14px;
+    padding: 0.5em;
+  }
+
+  #video-table th,
+  #video-table td {
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-width: none;
+  }
+
+  .group-btn {
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+
+  .title-scroll {
+    max-width: 100%;
+  }
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+button {
+  padding: 10px 15px;
+  font-size: 15px;
+  border-radius: 5px;
+  border: none;
+  background-color: #007bff;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+
+/* PC向け：12文字分に拡張 */
+@media screen and (min-width: 768px) {
+  #creators-table th.name-cell,
+  #creators-table td.name-cell,
+  .fixed-name-cell {
+    width: 12em;
+    min-width: 12em;
+    max-width: 12em;
+  }
+}
