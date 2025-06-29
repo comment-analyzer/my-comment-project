@@ -17,7 +17,8 @@
       padding: 1rem;
       background: #f5f5f5;
       margin: 0;
-      touch-action: manipulation;
+      /* ページ全体のスクロールは維持、但しチャート部分では制御 */
+      touch-action: auto;
     }
 
     .header {
@@ -39,6 +40,8 @@
       padding: 15px;
       box-sizing: border-box;
       overflow: hidden;
+      /* チャート部分ではパンとズームのみ許可 */
+      touch-action: pan-x pinch-zoom;
     }
 
     canvas {
@@ -46,6 +49,8 @@
       width: 100% !important;
       height: 100% !important;
       cursor: pointer;
+      /* キャンバスでは水平パンのみ許可 */
+      touch-action: pan-x;
     }
 
     .controls {
@@ -69,6 +74,8 @@
       gap: 6px;
       min-height: 44px;
       box-sizing: border-box;
+      /* ボタンのタッチ操作を確実に */
+      touch-action: manipulation;
     }
 
     #resetZoom {
@@ -108,6 +115,7 @@
       justify-content: center;
       font-size: 16px;
       font-weight: bold;
+      touch-action: manipulation;
     }
 
     .zoom-btn:hover {
@@ -146,6 +154,7 @@
       height: 100%;
       background-color: rgba(0,0,0,0.5);
       backdrop-filter: blur(3px);
+      touch-action: manipulation;
     }
 
     .modal-content {
@@ -176,6 +185,7 @@
       cursor: pointer;
       min-width: 80px;
       transition: all 0.2s;
+      touch-action: manipulation;
     }
 
     .modal-btn.confirm {
@@ -250,7 +260,7 @@
       <button id="zoomOut" class="btn zoom-btn">−</button>
       <button id="zoomIn" class="btn zoom-btn">+</button>
     </div>
-    <button id="resetZoom" class="btn">🔄 1時間表示</button>
+    <button id="resetZoom" class="btn">🔄 30分表示</button>
     <button id="showAll" class="btn">📊 全体表示</button>
   </div>
   
@@ -369,7 +379,7 @@
     function resetZoom() {
       if (!chart) return;
       chart.options.scales.x.min = 0;
-      chart.options.scales.x.max = Math.min(3600, totalDuration); // 初期は1時間
+      chart.options.scales.x.max = Math.min(1800, totalDuration); // 30分表示に変更
       chart.update('none');
       updateTimeInfo();
     }
@@ -380,6 +390,44 @@
       chart.options.scales.x.max = totalDuration;
       chart.update('none');
       updateTimeInfo();
+    }
+
+    // スマホでのタッチイベント処理を強化
+    function setupTouchHandling() {
+      const canvas = document.getElementById('commentChart');
+      const container = document.getElementById('chart-container');
+      
+      // キャンバスでのタッチイベントを適切に処理
+      canvas.addEventListener('touchstart', function(e) {
+        // チャート操作時はページスクロールを防ぐ
+        if (e.touches.length <= 2) { // パンやピンチの場合のみ
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      canvas.addEventListener('touchmove', function(e) {
+        // チャート操作時はページスクロールを防ぐ
+        if (e.touches.length <= 2) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      // コンテナでも同様の処理
+      container.addEventListener('touchstart', function(e) {
+        if (e.target === canvas || canvas.contains(e.target)) {
+          if (e.touches.length <= 2) {
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
+      
+      container.addEventListener('touchmove', function(e) {
+        if (e.target === canvas || canvas.contains(e.target)) {
+          if (e.touches.length <= 2) {
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
     }
 
     // チャート作成
@@ -429,7 +477,7 @@
               type: 'linear',
               position: 'bottom',
               min: 0,
-              max: Math.min(3600, totalDuration), // 初期表示は1時間
+              max: Math.min(1800, totalDuration), // 初期表示は30分に変更
               title: { 
                 display: true, 
                 text: "経過時間",
@@ -519,6 +567,9 @@
 
       // 初期の時間情報を表示
       updateTimeInfo();
+      
+      // スマホ向けタッチハンドリングを設定
+      setupTouchHandling();
     }
 
     // データ読み込み
