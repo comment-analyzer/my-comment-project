@@ -31,9 +31,10 @@
   
   <div class="instructions">
     📱 <strong>操作方法：</strong><br>
-    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム</span>
-    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能</span><br>
-    グラフの点をタップ/クリックすると該当時間のYouTube動画に移動
+    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム<br>
+    グラフの点を<strong>ダブルタップ</strong>すると該当時間のYouTube動画に移動</span>
+    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能<br>
+    グラフの点を<strong>ダブルクリック</strong>すると該当時間のYouTube動画に移動</span>
   </div>
 
   <!-- デバッグ情報 -->
@@ -68,6 +69,11 @@
     let hasMoved = false;
     let isTooltipEnabled = true;
     let tooltipHideTimeout = null;
+
+    // ダブルタップ/ダブルクリック検出用
+    let lastTapTime = 0;
+    let lastClickTime = 0;
+    const doubleTapDelay = 300; // ダブルタップ検出の時間間隔
 
     // デバッグ情報表示
     function debugLog(message) {
@@ -163,31 +169,37 @@
       pendingUrl = null;
     }
 
-    // Chart.jsのAPIを使用してクリック位置のデータポイントを取得
-    function getDataPointAtPosition(event) {
-      if (!chart) return null;
-      
-      const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
-      debugLog(`Elements found: ${elements.length}`);
-      
-      if (elements.length > 0) {
-        const element = elements[0];
-        const datasetIndex = element.datasetIndex;
-        const index = element.index;
-        
-        const timeValue = chart.data.labels[index];
-        const countValue = chart.data.datasets[datasetIndex].data[index];
-        
-        debugLog(`Found data point - Time: ${formatTime(timeValue)}, Count: ${countValue}`);
-        
-        return {
-          index: index,
-          time: timeValue,
-          count: countValue
-        };
+    // アクティブなツールチップから時間を取得
+    function getActiveTooltipTime() {
+      if (!chart || !chart.tooltip || !chart.tooltip.dataPoints) {
+        debugLog('No active tooltip found');
+        return null;
       }
       
-      return null;
+      const dataPoints = chart.tooltip.dataPoints;
+      if (dataPoints.length === 0) {
+        debugLog('No data points in tooltip');
+        return null;
+      }
+      
+      const timeValue = dataPoints[0].parsed.x;
+      debugLog(`Active tooltip time: ${formatTime(timeValue)}`);
+      return timeValue;
+    }
+
+    // ダブルタップ/ダブルクリック処理
+    function handleDoubleAction() {
+      if (isDragging || isScrolling) {
+        debugLog('Double action ignored due to dragging/scrolling');
+        return;
+      }
+      
+      const tooltipTime = getActiveTooltipTime();
+      if (tooltipTime !== null) {
+        showConfirmModal(tooltipTime);
+      } else {
+        debugLog('No active tooltip time available for double action');
+      }
     }
 
     // ズーム・パン操作
@@ -381,7 +393,6 @@
       canvas.addEventListener('touchend', function(e) {
         const endTime = Date.now();
         const touchDuration = endTime - startTime;
-        const touch = e.changedTouches[0];
         
         setTimeout(hideScrollHint, 500);
         
@@ -394,25 +405,20 @@
         debugLog(`Touch end - Duration: ${touchDuration}ms, MovementX: ${totalMovementX}, MovementY: ${totalMovementY}, IsTap: ${isTap}`);
         
         if (isTap) {
-          // Chart.jsのAPIを使用してタップ位置のデータポイントを取得
-          const rect = canvas.getBoundingClientRect();
-          const x = touch.clientX - rect.left;
-          const y = touch.clientY - rect.top;
+          const currentTime = Date.now();
+          const timeSinceLastTap = currentTime - lastTapTime;
           
-          debugLog(`Tap detected at canvas position: ${x}, ${y}`);
+          debugLog(`Tap detected - Time since last tap: ${timeSinceLastTap}ms`);
           
-          // 疑似イベントオブジェクトを作成
-          const fakeEvent = {
-            x: touch.clientX,
-            y: touch.clientY,
-            native: true
-          };
-          
-          const dataPoint = getDataPointAtPosition(fakeEvent);
-          if (dataPoint) {
-            showConfirmModal(dataPoint.time);
+          if (timeSinceLastTap < doubleTapDelay) {
+            // ダブルタップ検出
+            debugLog('Double tap detected');
+            handleDoubleAction();
+            lastTapTime = 0; // リセット
           } else {
-            debugLog('No data point found at tap position');
+            // シングルタップ
+            debugLog('Single tap detected');
+            lastTapTime = currentTime;
           }
         }
         
@@ -430,6 +436,38 @@
         
         e.preventDefault();
       }, { passive: false });
+    }
+
+    // PC用のダブルクリック処理
+    function setupDoubleClickHandling() {
+      if (isTouchDevice) return;
+      
+      const canvas = document.getElementById('commentChart');
+      
+      canvas.addEventListener('click', function(e) {
+        if (isDragging || isScrolling) {
+          debugLog('Click ignored due to dragging/scrolling');
+          return;
+        }
+        
+        const currentTime = Date.now();
+        const timeSinceLastClick = currentTime - lastClickTime;
+        
+        debugLog(`Click detected - Time since last click: ${timeSinceLastClick}ms`);
+        
+        if (timeSinceLastClick < doubleTapDelay) {
+          // ダブルクリック検出
+          debugLog('Double click detected');
+          handleDoubleAction();
+          lastClickTime = 0; // リセット
+        } else {
+          // シングルクリック
+          debugLog('Single click detected');
+          lastClickTime = currentTime;
+        }
+        
+        e.preventDefault();
+      });
     }
 
     // チャート作成
@@ -469,22 +507,6 @@
           interaction: {
             intersect: false,
             mode: 'nearest'
-          },
-          onClick: (event, elements) => {
-            debugLog(`Chart clicked - Elements: ${elements.length}, isDragging: ${isDragging}, isScrolling: ${isScrolling}`);
-            
-            if (isDragging || isScrolling) {
-              debugLog('Click ignored due to dragging/scrolling');
-              return;
-            }
-            
-            // PC用のクリック処理
-            if (!isTouchDevice && elements.length > 0) {
-              const elementIndex = elements[0].index;
-              const timeInSeconds = labels[elementIndex];
-              debugLog(`PC click: Opening modal for time ${formatTime(timeInSeconds)}`);
-              showConfirmModal(timeInSeconds);
-            }
           },
           onHover: (event, elements) => {
             // スクロール中はホバー効果も無効化
@@ -592,7 +614,7 @@
               callbacks: {
                 title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
                 label: (context) => `コメント数: ${context.parsed.y}件`,
-                footer: () => isTouchDevice ? 'タップで動画のこの時間に移動' : 'クリックで動画のこの時間に移動'
+                footer: () => isTouchDevice ? 'ダブルタップで動画のこの時間に移動' : 'ダブルクリックで動画のこの時間に移動'
               }
             }
           }
@@ -606,6 +628,7 @@
         setTimeout(() => showScrollHintTemporary(), 500);
       } else {
         setupCustomWheelHandler();
+        setupDoubleClickHandling();
       }
     }
 
