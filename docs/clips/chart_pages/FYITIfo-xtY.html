@@ -1,77 +1,133 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チャートページ - FYITIfo-xtY</title>
-    <link rel="stylesheet" href="/static/style/main.css">
-    
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8" />
+  <title>コメントグラフ - FYITIfo-xtY</title>
 
+  <!-- モバイルズーム抑制 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <!-- Chart.js & Zoom Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      background: #f9f9f9;
+      overflow-x: hidden;
+    }
+
+    #chart-container {
+      position: relative;
+      height: 400px;
+      max-width: 100vw; /* 追加 */
+      overflow-x: auto;
+    }
+
+    canvas {
+      background: white;
+      border-radius: 8px;
+      padding: 10px;
+      box-sizing: border-box; /* 追加 */
+      width: 100%;
+    }
+
+    #resetZoom {
+      margin-top: 1rem;
+      padding: 6px 12px;
+      background: #42A5F5;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #resetZoom:hover {
+      background: #1E88E5;
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <nav>
-            <a href="/">ホーム</a>
-            <!-- 他のナビゲーションリンクがあればここに追加 -->
-        </nav>
-    </header>
+  <div id="chart-container">
+    <canvas id="commentChart"></canvas>
+  </div>
+  <button id="resetZoom">🔄 ズームをリセット</button>
 
-    <main>
-        
-    <a href="/" class="back-link">← 一覧に戻る</a>
-    <h1>動画チャート: FYITIfo-xtY</h1>
+  <script>
+    const VIDEO_ID = "FYITIfo-xtY";
 
-    <div class="video-player">
-        <iframe width="560" height="315" src="https://www.youtube.com/embed/FYITIfo-xtY" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    </div>
+    fetch("../chart_data/" + VIDEO_ID + "_chart.json")
+      .then(res => res.json())
+      .then(data => {
+        const labels = data.map(d => d.time);
+        const counts = data.map(d => d.count);
 
-    <div class="chart-container">
-        <canvas id="commentChart"></canvas>
-    </div>
+        const ctx = document.getElementById("commentChart").getContext("2d");
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            fetch('/output/clips/chart_data/FYITIfo-xtY_chart.json')
-                .then(response => response.json())
-                .then(data => {
-                    const labels = data.map(item => item.time + 's');
-                    const commentCounts = data.map(item => item.count);
-
-                    const ctx = document.getElementById('commentChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'コメント数',
-                                data: commentCounts,
-                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                                borderColor: 'rgba(75, 192, 192, 1)',
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
-                        }
-                    });
-                })
-                .catch(error => console.error('Error loading chart data:', error));
+        const chart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "コメント数（10秒ごと）",
+              data: counts,
+              borderColor: "#42A5F5",
+              backgroundColor: "rgba(66,165,245,0.2)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              pointHoverRadius: 5
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: { display: true, text: "経過時間（秒）" }
+              },
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: "コメント数" }
+              }
+            },
+            plugins: {
+              zoom: {
+                pan: {
+                  enabled: true,
+                  mode: 'x',
+                  modifierKey: null // スマホでも有効
+                },
+                zoom: {
+                  wheel: {
+                    enabled: true
+                  },
+                  pinch: {
+                    enabled: true
+                  },
+                  mode: 'x'
+                },
+                limits: {
+                  x: { min: 'original', max: 'original' },
+                  y: { min: 0 }
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: context => `コメント数: ${context.parsed.y}`
+                }
+              }
+            }
         });
-    </script>
 
-    </main>
-
-    <footer>
-        <p>&copy; 2024 YouTube Clipper</p>
-        
-    </footer>
-
-    
+        // リセットボタン
+        document.getElementById("resetZoom").addEventListener("click", () => {
+          chart.resetZoom();
+        });
+      });
+  </script>
 </body>
 </html>
