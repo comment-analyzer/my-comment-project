@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チャートページ - o8oD_0EgPTA</title>
+    <link rel="stylesheet" href="/static/style/main.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/">ホーム</a>
+            <!-- 他のナビゲーションリンクがあればここに追加 -->
+        </nav>
+    </header>
+
+    <main>
+        
+    <a href="/" class="back-link">← 一覧に戻る</a>
+    <h1>動画チャート: o8oD_0EgPTA</h1>
+
+    <div class="video-player">
+        <iframe width="560" height="315" src="https://www.youtube.com/embed/o8oD_0EgPTA" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="commentChart"></canvas>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/output/clips/chart_data/o8oD_0EgPTA_chart.json')
+                .then(response => response.json())
+                .then(data => {
+                    const labels = data.map(item => item.time + 's');
+                    const commentCounts = data.map(item => item.count);
+
+                    const ctx = document.getElementById('commentChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'コメント数',
+                                data: commentCounts,
+                                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => console.error('Error loading chart data:', error));
+        });
+    </script>
+
+    </main>
+
+    <footer>
+        <p>&copy; 2024 YouTube Clipper</p>
+        
+    </footer>
+
+    
+</body>
+</html>
