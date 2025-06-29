@@ -5,7 +5,7 @@
   <title>コメントグラフ - zwEaU0fb_g4</title>
 
   <!-- スマホでの拡大縮小を許可 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes" />
 
   <!-- Chart.js & Zoom Plugin -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -17,7 +17,7 @@
       padding: 1rem;
       background: #f5f5f5;
       margin: 0;
-      touch-action: manipulation; /* タッチ操作を最適化 */
+      touch-action: manipulation;
     }
 
     .header {
@@ -39,15 +39,6 @@
       padding: 15px;
       box-sizing: border-box;
       overflow: hidden;
-      /* スマホでの自然な拡大縮小を有効化 */
-      touch-action: none;
-    }
-
-    #chart-wrapper {
-      width: 100%;
-      height: 100%;
-      transform-origin: center center;
-      transition: transform 0.1s ease-out;
     }
 
     canvas {
@@ -76,7 +67,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      min-height: 44px; /* タッチしやすいサイズ */
+      min-height: 44px;
       box-sizing: border-box;
     }
 
@@ -90,8 +81,47 @@
       transform: translateY(-1px);
     }
 
-    #resetZoom:active {
-      transform: translateY(0);
+    #showAll {
+      background: #4CAF50;
+      color: white;
+    }
+
+    #showAll:hover {
+      background: #45a049;
+      transform: translateY(-1px);
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .zoom-btn {
+      background: #666;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .zoom-btn:hover {
+      background: #555;
+    }
+
+    .time-info {
+      background: rgba(66, 165, 245, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #333;
+      text-align: center;
+      margin-top: 10px;
     }
 
     .instructions {
@@ -210,18 +240,23 @@
   <div class="header">📊 コメント数の推移</div>
   
   <div id="chart-container">
-    <div id="chart-wrapper">
-      <canvas id="commentChart"></canvas>
-    </div>
+    <canvas id="commentChart"></canvas>
   </div>
   
+  <div id="timeInfo" class="time-info"></div>
+  
   <div class="controls">
-    <button id="resetZoom" class="btn">🔄 ズームリセット</button>
+    <div class="zoom-controls">
+      <button id="zoomOut" class="btn zoom-btn">−</button>
+      <button id="zoomIn" class="btn zoom-btn">+</button>
+    </div>
+    <button id="resetZoom" class="btn">🔄 1時間表示</button>
+    <button id="showAll" class="btn">📊 全体表示</button>
   </div>
   
   <div class="instructions">
     📱 <strong>操作方法：</strong><br>
-    ピンチでグラフ全体を拡大、ドラッグで移動<br>
+    ドラッグで時間軸を移動、+/−ボタンでズーム<br>
     グラフの点をタップすると該当時間のYouTube動画に移動
   </div>
 
@@ -241,48 +276,8 @@
     const VIDEO_ID = "zwEaU0fb_g4";
     let chart;
     let pendingUrl = null;
-
-    // ピンチズーム用の変数
-    let scale = 1;
-    let isPinching = false;
-    let lastTouchDistance = 0;
-    let translateX = 0;
-    let translateY = 0;
-    let lastTouchX = 0;
-    let lastTouchY = 0;
-
-    // タッチ間の距離を計算
-    function getTouchDistance(e) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const dx = touch1.clientX - touch2.clientX;
-      const dy = touch1.clientY - touch2.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    // チャート要素の取得
-    function getChartWrapper() {
-      return document.getElementById('chart-wrapper');
-    }
-
-    // 変形を適用
-    function applyTransform() {
-      const wrapper = getChartWrapper();
-      if (wrapper) {
-        wrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-      }
-    }
-
-    // ズームをリセット
-    function resetZoom() {
-      scale = 1;
-      translateX = 0;
-      translateY = 0;
-      applyTransform();
-      if (chart) {
-        chart.resetZoom();
-      }
-    }
+    let chartData = [];
+    let totalDuration = 0;
 
     // 時間フォーマット関数
     function formatTime(seconds) {
@@ -295,6 +290,28 @@
       } else {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
       }
+    }
+
+    // 時間情報を更新
+    function updateTimeInfo() {
+      if (!chart) return;
+      
+      const xScale = chart.scales.x;
+      const min = Math.floor(xScale.min || 0);
+      const max = Math.floor(xScale.max || totalDuration);
+      const range = max - min;
+      
+      let rangeText = '';
+      if (range >= 3600) {
+        rangeText = `${Math.round(range / 3600 * 10) / 10}時間`;
+      } else if (range >= 60) {
+        rangeText = `${Math.round(range / 60)}分`;
+      } else {
+        rangeText = `${range}秒`;
+      }
+      
+      document.getElementById('timeInfo').textContent = 
+        `表示範囲: ${formatTime(min)} 〜 ${formatTime(max)} (${rangeText})`;
     }
 
     // YouTube URLを生成
@@ -318,11 +335,59 @@
       pendingUrl = null;
     }
 
+    // ズーム・パン操作
+    function zoomIn() {
+      if (!chart) return;
+      const xScale = chart.scales.x;
+      const currentMin = xScale.min || 0;
+      const currentMax = xScale.max || totalDuration;
+      const currentRange = currentMax - currentMin;
+      const newRange = Math.max(60, currentRange * 0.5); // 最小1分
+      const center = (currentMin + currentMax) / 2;
+      
+      chart.options.scales.x.min = Math.max(0, center - newRange / 2);
+      chart.options.scales.x.max = Math.min(totalDuration, center + newRange / 2);
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function zoomOut() {
+      if (!chart) return;
+      const xScale = chart.scales.x;
+      const currentMin = xScale.min || 0;
+      const currentMax = xScale.max || totalDuration;
+      const currentRange = currentMax - currentMin;
+      const newRange = Math.min(totalDuration, currentRange * 2);
+      const center = (currentMin + currentMax) / 2;
+      
+      chart.options.scales.x.min = Math.max(0, center - newRange / 2);
+      chart.options.scales.x.max = Math.min(totalDuration, center + newRange / 2);
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function resetZoom() {
+      if (!chart) return;
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = Math.min(3600, totalDuration); // 初期は1時間
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function showAll() {
+      if (!chart) return;
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = totalDuration;
+      chart.update('none');
+      updateTimeInfo();
+    }
+
     // チャート作成
     function createChart(data) {
+      chartData = data;
       const labels = data.map(d => d.time);
       const counts = data.map(d => d.count);
-      const maxTime = Math.max(...labels);
+      totalDuration = Math.max(...labels);
 
       const ctx = document.getElementById("commentChart").getContext("2d");
 
@@ -363,13 +428,14 @@
             x: {
               type: 'linear',
               position: 'bottom',
+              min: 0,
+              max: Math.min(3600, totalDuration), // 初期表示は1時間
               title: { 
                 display: true, 
                 text: "経過時間",
                 font: { size: 12, weight: 'bold' }
               },
               ticks: {
-                stepSize: 1800, // 30分 = 1800秒
                 callback: function(value) {
                   return formatTime(value);
                 },
@@ -404,24 +470,27 @@
                 enabled: true,
                 mode: 'x',
                 modifierKey: null,
-                threshold: 5 // スマホでの感度調整
+                onPanComplete: () => {
+                  updateTimeInfo();
+                }
               },
               zoom: {
                 wheel: {
                   enabled: true,
-                  speed: 0.05,
-                  modifierKey: null
+                  speed: 0.1
                 },
                 pinch: {
                   enabled: true
                 },
                 mode: 'x',
-                sensitivity: 3
+                onZoomComplete: () => {
+                  updateTimeInfo();
+                }
               },
               limits: {
                 x: { 
                   min: 0,
-                  max: maxTime,
+                  max: totalDuration,
                   minRange: 60 // 最小1分の範囲
                 },
                 y: { 
@@ -447,6 +516,9 @@
           }
         }
       });
+
+      // 初期の時間情報を表示
+      updateTimeInfo();
     }
 
     // データ読み込み
@@ -456,63 +528,10 @@
         createChart(data);
         
         // イベントリスナー設定
+        document.getElementById("zoomIn").addEventListener("click", zoomIn);
+        document.getElementById("zoomOut").addEventListener("click", zoomOut);
         document.getElementById("resetZoom").addEventListener("click", resetZoom);
-        
-        // スマホでのピンチズーム対応
-        const chartContainer = document.getElementById('chart-container');
-        
-        chartContainer.addEventListener('touchstart', (e) => {
-          if (e.touches.length === 2) {
-            isPinching = true;
-            lastTouchDistance = getTouchDistance(e);
-            e.preventDefault();
-          } else if (e.touches.length === 1) {
-            lastTouchX = e.touches[0].clientX;
-            lastTouchY = e.touches[0].clientY;
-          }
-        }, { passive: false });
-        
-        chartContainer.addEventListener('touchmove', (e) => {
-          if (isPinching && e.touches.length === 2) {
-            const currentDistance = getTouchDistance(e);
-            const scaleChange = currentDistance / lastTouchDistance;
-            
-            scale *= scaleChange;
-            scale = Math.max(0.5, Math.min(scale, 5)); // 0.5倍から5倍まで
-            
-            lastTouchDistance = currentDistance;
-            applyTransform();
-            e.preventDefault();
-          } else if (!isPinching && e.touches.length === 1 && scale > 1) {
-            // パン操作（ズーム時のみ）
-            const currentX = e.touches[0].clientX;
-            const currentY = e.touches[0].clientY;
-            
-            translateX += (currentX - lastTouchX) / scale;
-            translateY += (currentY - lastTouchY) / scale;
-            
-            lastTouchX = currentX;
-            lastTouchY = currentY;
-            
-            applyTransform();
-            e.preventDefault();
-          }
-        }, { passive: false });
-        
-        chartContainer.addEventListener('touchend', (e) => {
-          if (e.touches.length < 2) {
-            isPinching = false;
-          }
-        });
-        
-        // マウスホイールでのズーム（PC用）
-        chartContainer.addEventListener('wheel', (e) => {
-          e.preventDefault();
-          const delta = e.deltaY > 0 ? 0.9 : 1.1;
-          scale *= delta;
-          scale = Math.max(0.5, Math.min(scale, 5));
-          applyTransform();
-        }, { passive: false });
+        document.getElementById("showAll").addEventListener("click", showAll);
         
         // モーダルイベント
         document.getElementById("confirmYes").addEventListener("click", () => {
