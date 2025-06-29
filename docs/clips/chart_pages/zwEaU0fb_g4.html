@@ -37,9 +37,6 @@
     グラフの点を<strong>ダブルクリック</strong>すると該当時間のYouTube動画に移動</span>
   </div>
 
-  <!-- デバッグ情報 -->
-  <div id="debugInfo" class="debug-info"></div>
-
   <!-- 確認モーダル -->
   <div id="confirmModal" class="modal">
     <div class="modal-content">
@@ -74,18 +71,6 @@
     let lastTapTime = 0;
     let lastClickTime = 0;
     const doubleTapDelay = 300; // ダブルタップ検出の時間間隔
-
-    // デバッグ情報表示
-    function debugLog(message) {
-      console.log(message);
-      const debugDiv = document.getElementById('debugInfo');
-      debugDiv.innerHTML = `<div>${new Date().toLocaleTimeString()}: ${message}</div>` + debugDiv.innerHTML;
-      // 最新の10件だけ保持
-      const logs = debugDiv.children;
-      if (logs.length > 10) {
-        debugDiv.removeChild(logs[logs.length - 1]);
-      }
-    }
 
     // ツールチップの表示制御
     function disableTooltip() {
@@ -160,7 +145,6 @@
       modalTime.textContent = `動画の ${formatTime(timeInSeconds)} から再生します`;
       pendingUrl = generateYouTubeUrl(VIDEO_ID, timeInSeconds);
       modal.style.display = 'block';
-      debugLog(`Modal opened for time: ${formatTime(timeInSeconds)}`);
     }
 
     // モーダル非表示
@@ -172,33 +156,27 @@
     // アクティブなツールチップから時間を取得
     function getActiveTooltipTime() {
       if (!chart || !chart.tooltip || !chart.tooltip.dataPoints) {
-        debugLog('No active tooltip found');
         return null;
       }
       
       const dataPoints = chart.tooltip.dataPoints;
       if (dataPoints.length === 0) {
-        debugLog('No data points in tooltip');
         return null;
       }
       
       const timeValue = dataPoints[0].parsed.x;
-      debugLog(`Active tooltip time: ${formatTime(timeValue)}`);
       return timeValue;
     }
 
     // ダブルタップ/ダブルクリック処理
     function handleDoubleAction() {
       if (isDragging || isScrolling) {
-        debugLog('Double action ignored due to dragging/scrolling');
         return;
       }
       
       const tooltipTime = getActiveTooltipTime();
       if (tooltipTime !== null) {
         showConfirmModal(tooltipTime);
-      } else {
-        debugLog('No active tooltip time available for double action');
       }
     }
 
@@ -295,8 +273,7 @@
           const deltaY = e.deltaY;
           
           const scrollDelta = deltaX !== 0 ? deltaX : deltaY;
-          // PC用のスクロール感度を下げる
-          const scrollSensitivity = range * 0.03; // 0.05から0.03に変更
+          const scrollSensitivity = range * 0.03; 
           const timeShift = (scrollDelta > 0 ? 1 : -1) * scrollSensitivity;
           
           const newMin = Math.max(0, currentMin + timeShift);
@@ -314,7 +291,7 @@
       }, { passive: false });
     }
 
-    // タッチハンドリング（スマホ用）- 感度調整版
+    // タッチハンドリング（スマホ用）
     function setupTouchHandling() {
       if (!isTouchDevice) return;
       
@@ -338,7 +315,6 @@
         isDragging = false;
         isScrolling = false;
         
-        debugLog(`Touch start at: ${touch.clientX}, ${touch.clientY}`);
         e.preventDefault();
       }, { passive: false });
       
@@ -368,9 +344,8 @@
             const rect = canvas.getBoundingClientRect();
             const canvasWidth = rect.width;
             
-            // スマホ用のスクロール感度を大幅に下げる
             const basePixelRatio = range / canvasWidth;
-            const sensitivityFactor = 0.3; // 感度を30%に削減（元は100%）
+            const sensitivityFactor = 0.3; 
             const pixelRatio = basePixelRatio * sensitivityFactor;
             const timeShift = -deltaX * pixelRatio;
             
@@ -402,22 +377,16 @@
                      totalMovementY < 20 && 
                      !hasMoved;
         
-        debugLog(`Touch end - Duration: ${touchDuration}ms, MovementX: ${totalMovementX}, MovementY: ${totalMovementY}, IsTap: ${isTap}`);
-        
         if (isTap) {
           const currentTime = Date.now();
           const timeSinceLastTap = currentTime - lastTapTime;
           
-          debugLog(`Tap detected - Time since last tap: ${timeSinceLastTap}ms`);
-          
           if (timeSinceLastTap < doubleTapDelay) {
             // ダブルタップ検出
-            debugLog('Double tap detected');
             handleDoubleAction();
             lastTapTime = 0; // リセット
           } else {
             // シングルタップ
-            debugLog('Single tap detected');
             lastTapTime = currentTime;
           }
         }
@@ -446,23 +415,18 @@
       
       canvas.addEventListener('click', function(e) {
         if (isDragging || isScrolling) {
-          debugLog('Click ignored due to dragging/scrolling');
           return;
         }
         
         const currentTime = Date.now();
         const timeSinceLastClick = currentTime - lastClickTime;
         
-        debugLog(`Click detected - Time since last click: ${timeSinceLastClick}ms`);
-        
         if (timeSinceLastClick < doubleTapDelay) {
           // ダブルクリック検出
-          debugLog('Double click detected');
           handleDoubleAction();
           lastClickTime = 0; // リセット
         } else {
           // シングルクリック
-          debugLog('Single click detected');
           lastClickTime = currentTime;
         }
         
@@ -477,8 +441,6 @@
       const counts = data.map(d => d.count);
       totalDuration = Math.max(...labels);
       maxCommentCount = Math.max(...counts);
-
-      debugLog(`Chart data loaded: ${data.length} points, duration: ${formatTime(totalDuration)}`);
 
       const ctx = document.getElementById("commentChart").getContext("2d");
 
@@ -632,30 +594,11 @@
       }
     }
 
-    // データ読み込み（テスト用のサンプルデータも含む）
-    // 実際のデータファイルが見つからない場合はサンプルデータを使用
+    // データ読み込み
     fetch("../chart_data/" + VIDEO_ID + "_chart.json")
-      .then(res => {
-        if (!res.ok) throw new Error('Data file not found');
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
         createChart(data);
-      })
-      .catch(error => {
-        console.warn('Failed to load data file, using sample data:', error);
-        debugLog('Using sample data for testing');
-        
-        // サンプルデータを生成
-        const sampleData = [];
-        for (let i = 0; i <= 3600; i += 10) {
-          sampleData.push({
-            time: i,
-            count: Math.floor(Math.random() * 50) + 5
-          });
-        }
-        
-        createChart(sampleData);
       })
       .finally(() => {
         // ボタンイベント
@@ -667,7 +610,6 @@
         // モーダルイベント
         document.getElementById("confirmYes").addEventListener("click", () => {
           if (pendingUrl) {
-            debugLog(`Opening YouTube URL: ${pendingUrl}`);
             window.open(pendingUrl, '_blank');
           }
           hideConfirmModal();
@@ -809,24 +751,6 @@
       color: #333;
       text-align: center;
       margin-top: 10px;
-    }
-
-    .debug-info {
-      background: rgba(255, 255, 0, 0.1);
-      border: 1px solid rgba(255, 255, 0, 0.3);
-      border-radius: 6px;
-      padding: 8px;
-      margin-top: 10px;
-      font-size: 11px;
-      font-family: monospace;
-      max-height: 150px;
-      overflow-y: auto;
-    }
-
-    .debug-info div {
-      margin: 2px 0;
-      padding: 2px;
-      border-bottom: 1px solid rgba(0,0,0,0.1);
     }
 
     .instructions {

@@ -3,137 +3,914 @@
 <head>
   <meta charset="UTF-8" />
   <title>コメントグラフ - drz5fvV_ykk</title>
-
-  <!-- モバイルズーム抑制 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes" />
+  
   <!-- Chart.js & Zoom Plugin -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  
+</head>
+<body>
+  <div class="header">📊 コメント数の推移</div>
+  
+  <div id="chart-container">
+    <canvas id="commentChart"></canvas>
+    <div id="scrollHint" class="scroll-hint">← スワイプで時間軸を移動 →</div>
+  </div>
+  
+  <div id="timeInfo" class="time-info"></div>
+  
+  <div class="controls">
+    <div class="zoom-controls">
+      <button id="zoomOut" class="btn zoom-btn">−</button>
+      <button id="zoomIn" class="btn zoom-btn">+</button>
+    </div>
+    <button id="resetZoom" class="btn">🔄 30分表示</button>
+    <button id="showAll" class="btn">📊 全体表示</button>
+  </div>
+  
+  <div class="instructions">
+    📱 <strong>操作方法：</strong><br>
+    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム<br>
+    グラフの点を<strong>ダブルタップ</strong>すると該当時間のYouTube動画に移動</span>
+    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能<br>
+    グラフの点を<strong>ダブルクリック</strong>すると該当時間のYouTube動画に移動</span>
+  </div>
 
+  <!-- 確認モーダル -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <h3>🎬 YouTube動画を開きますか？</h3>
+      <p id="modalTime"></p>
+      <div class="modal-buttons">
+        <button id="confirmYes" class="modal-btn confirm">開く</button>
+        <button id="confirmNo" class="modal-btn cancel">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const VIDEO_ID = "drz5fvV_ykk";
+    let chart;
+    let pendingUrl = null;
+    let chartData = [];
+    let totalDuration = 0;
+    let maxCommentCount = 0;
+    
+    // タッチ操作の状態管理
+    let touchStartTime = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isDragging = false;
+    let isScrolling = false;
+    let hasMoved = false;
+    let isTooltipEnabled = true;
+    let tooltipHideTimeout = null;
+
+    // ダブルタップ/ダブルクリック検出用
+    let lastTapTime = 0;
+    let lastClickTime = 0;
+    const doubleTapDelay = 300; // ダブルタップ検出の時間間隔
+
+    // ツールチップの表示制御
+    function disableTooltip() {
+      isTooltipEnabled = false;
+      if (chart && chart.tooltip) {
+        chart.tooltip.setActiveElements([], {x: 0, y: 0});
+        chart.update('none');
+      }
+      // 既存のタイマーをクリア
+      if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+      }
+    }
+
+    function enableTooltipWithDelay(delay = 300) {
+      if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+      }
+      tooltipHideTimeout = setTimeout(() => {
+        isTooltipEnabled = true;
+      }, delay);
+    }
+
+    // デバイス判定
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    // 時間フォーマット関数
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+      }
+    }
+
+    // 時間情報を更新
+    function updateTimeInfo() {
+      if (!chart) return;
+      
+      const xScale = chart.scales.x;
+      const min = Math.floor(xScale.min || 0);
+      const max = Math.floor(xScale.max || totalDuration);
+      const range = max - min;
+      
+      let rangeText = '';
+      if (range >= 3600) {
+        rangeText = `${Math.round(range / 3600 * 10) / 10}時間`;
+      } else if (range >= 60) {
+        rangeText = `${Math.round(range / 60)}分`;
+      } else {
+        rangeText = `${range}秒`;
+      }
+      
+      document.getElementById('timeInfo').textContent = 
+        `表示範囲: ${formatTime(min)} 〜 ${formatTime(max)} (${rangeText})`;
+    }
+
+    // YouTube URLを生成
+    function generateYouTubeUrl(videoId, timeInSeconds) {
+      return `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(timeInSeconds)}s`;
+    }
+
+    // モーダル表示
+    function showConfirmModal(timeInSeconds) {
+      const modal = document.getElementById('confirmModal');
+      const modalTime = document.getElementById('modalTime');
+      
+      modalTime.textContent = `動画の ${formatTime(timeInSeconds)} から再生します`;
+      pendingUrl = generateYouTubeUrl(VIDEO_ID, timeInSeconds);
+      modal.style.display = 'block';
+    }
+
+    // モーダル非表示
+    function hideConfirmModal() {
+      document.getElementById('confirmModal').style.display = 'none';
+      pendingUrl = null;
+    }
+
+    // アクティブなツールチップから時間を取得
+    function getActiveTooltipTime() {
+      if (!chart || !chart.tooltip || !chart.tooltip.dataPoints) {
+        return null;
+      }
+      
+      const dataPoints = chart.tooltip.dataPoints;
+      if (dataPoints.length === 0) {
+        return null;
+      }
+      
+      const timeValue = dataPoints[0].parsed.x;
+      return timeValue;
+    }
+
+    // ダブルタップ/ダブルクリック処理
+    function handleDoubleAction() {
+      if (isDragging || isScrolling) {
+        return;
+      }
+      
+      const tooltipTime = getActiveTooltipTime();
+      if (tooltipTime !== null) {
+        showConfirmModal(tooltipTime);
+      }
+    }
+
+    // ズーム・パン操作
+    function zoomIn() {
+      if (!chart) return;
+      const xScale = chart.scales.x;
+      const currentMin = xScale.min || 0;
+      const currentMax = xScale.max || totalDuration;
+      const currentRange = currentMax - currentMin;
+      const newRange = Math.max(60, currentRange * 0.5);
+      const center = (currentMin + currentMax) / 2;
+      
+      chart.options.scales.x.min = Math.max(0, center - newRange / 2);
+      chart.options.scales.x.max = Math.min(totalDuration, center + newRange / 2);
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function zoomOut() {
+      if (!chart) return;
+      const xScale = chart.scales.x;
+      const currentMin = xScale.min || 0;
+      const currentMax = xScale.max || totalDuration;
+      const currentRange = currentMax - currentMin;
+      const newRange = Math.min(totalDuration, currentRange * 2);
+      const center = (currentMin + currentMax) / 2;
+      
+      chart.options.scales.x.min = Math.max(0, center - newRange / 2);
+      chart.options.scales.x.max = Math.min(totalDuration, center + newRange / 2);
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function resetZoom() {
+      if (!chart) return;
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = Math.min(1800, totalDuration);
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    function showAll() {
+      if (!chart) return;
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = totalDuration;
+      chart.update('none');
+      updateTimeInfo();
+    }
+
+    // スクロールヒントの表示制御
+    function showScrollHint() {
+      const hint = document.getElementById('scrollHint');
+      hint.classList.add('show');
+    }
+
+    function hideScrollHint() {
+      const hint = document.getElementById('scrollHint');
+      hint.classList.remove('show');
+    }
+
+    function showScrollHintTemporary(duration = 3000) {
+      showScrollHint();
+      setTimeout(hideScrollHint, duration);
+    }
+
+    // カスタムホイールイベント処理（PC用）
+    function setupCustomWheelHandler() {
+      if (isTouchDevice) return;
+      
+      const canvas = document.getElementById('commentChart');
+      
+      canvas.addEventListener('wheel', function(e) {
+        if (!chart) return;
+        
+        const xScale = chart.scales.x;
+        const currentMin = xScale.min || 0;
+        const currentMax = xScale.max || totalDuration;
+        const range = currentMax - currentMin;
+        
+        if (e.ctrlKey) {
+          // Ctrl+ホイール：ズーム（Chart.jsのデフォルト動作を使用）
+          disableTooltip();
+          enableTooltipWithDelay(500);
+          return;
+        } else {
+          // 通常のホイール：パン
+          e.preventDefault();
+          
+          // ツールチップを無効化
+          disableTooltip();
+          
+          const deltaX = e.deltaX;
+          const deltaY = e.deltaY;
+          
+          const scrollDelta = deltaX !== 0 ? deltaX : deltaY;
+          const scrollSensitivity = range * 0.03; 
+          const timeShift = (scrollDelta > 0 ? 1 : -1) * scrollSensitivity;
+          
+          const newMin = Math.max(0, currentMin + timeShift);
+          const newMax = Math.min(totalDuration, currentMax + timeShift);
+          
+          chart.options.scales.x.min = newMin;
+          chart.options.scales.x.max = newMax;
+          chart.update('none');
+          
+          updateTimeInfo();
+          
+          // スクロール後に少し遅延してツールチップを再有効化
+          enableTooltipWithDelay(300);
+        }
+      }, { passive: false });
+    }
+
+    // タッチハンドリング（スマホ用）
+    function setupTouchHandling() {
+      if (!isTouchDevice) return;
+      
+      const canvas = document.getElementById('commentChart');
+      
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+      let lastX = 0;
+      let totalMovementX = 0;
+      let totalMovementY = 0;
+      
+      canvas.addEventListener('touchstart', function(e) {
+        const touch = e.touches[0];
+        startX = lastX = touch.clientX;
+        startY = touch.clientY;
+        startTime = Date.now();
+        totalMovementX = 0;
+        totalMovementY = 0;
+        hasMoved = false;
+        isDragging = false;
+        isScrolling = false;
+        
+        e.preventDefault();
+      }, { passive: false });
+      
+      canvas.addEventListener('touchmove', function(e) {
+        const touch = e.touches[0];
+        const currentX = touch.clientX;
+        const currentY = touch.clientY;
+        
+        const deltaX = currentX - lastX;
+        totalMovementX += Math.abs(currentX - startX);
+        totalMovementY += Math.abs(currentY - startY);
+        
+        // 横方向の動きが縦方向より大きい場合のみパンを実行
+        if (totalMovementX > 10 && totalMovementX > totalMovementY) {
+          hasMoved = true;
+          isDragging = true;
+          isScrolling = true;
+          
+          // スクロール開始時にツールチップを無効化
+          disableTooltip();
+          
+          if (chart && chart.scales.x) {
+            const xScale = chart.scales.x;
+            const currentMin = xScale.min || 0;
+            const currentMax = xScale.max || totalDuration;
+            const range = currentMax - currentMin;
+            const rect = canvas.getBoundingClientRect();
+            const canvasWidth = rect.width;
+            
+            const basePixelRatio = range / canvasWidth;
+            const sensitivityFactor = 0.3; 
+            const pixelRatio = basePixelRatio * sensitivityFactor;
+            const timeShift = -deltaX * pixelRatio;
+            
+            const newMin = Math.max(0, currentMin + timeShift);
+            const newMax = Math.min(totalDuration, currentMax + timeShift);
+            
+            chart.options.scales.x.min = newMin;
+            chart.options.scales.x.max = newMax;
+            chart.update('none');
+            
+            updateTimeInfo();
+            showScrollHint();
+          }
+        }
+        
+        lastX = currentX;
+        e.preventDefault();
+      }, { passive: false });
+      
+      canvas.addEventListener('touchend', function(e) {
+        const endTime = Date.now();
+        const touchDuration = endTime - startTime;
+        
+        setTimeout(hideScrollHint, 500);
+        
+        // タップ判定：短時間 && 小さな移動
+        const isTap = touchDuration < 400 && 
+                     totalMovementX < 20 && 
+                     totalMovementY < 20 && 
+                     !hasMoved;
+        
+        if (isTap) {
+          const currentTime = Date.now();
+          const timeSinceLastTap = currentTime - lastTapTime;
+          
+          if (timeSinceLastTap < doubleTapDelay) {
+            // ダブルタップ検出
+            handleDoubleAction();
+            lastTapTime = 0; // リセット
+          } else {
+            // シングルタップ
+            lastTapTime = currentTime;
+          }
+        }
+        
+        // スクロール終了時にツールチップを再有効化（少し遅延）
+        if (isDragging || isScrolling) {
+          enableTooltipWithDelay(500);
+        }
+        
+        // 状態をリセット
+        setTimeout(() => {
+          isDragging = false;
+          isScrolling = false;
+          hasMoved = false;
+        }, 100);
+        
+        e.preventDefault();
+      }, { passive: false });
+    }
+
+    // PC用のダブルクリック処理
+    function setupDoubleClickHandling() {
+      if (isTouchDevice) return;
+      
+      const canvas = document.getElementById('commentChart');
+      
+      canvas.addEventListener('click', function(e) {
+        if (isDragging || isScrolling) {
+          return;
+        }
+        
+        const currentTime = Date.now();
+        const timeSinceLastClick = currentTime - lastClickTime;
+        
+        if (timeSinceLastClick < doubleTapDelay) {
+          // ダブルクリック検出
+          handleDoubleAction();
+          lastClickTime = 0; // リセット
+        } else {
+          // シングルクリック
+          lastClickTime = currentTime;
+        }
+        
+        e.preventDefault();
+      });
+    }
+
+    // チャート作成
+    function createChart(data) {
+      chartData = data;
+      const labels = data.map(d => d.time);
+      const counts = data.map(d => d.count);
+      totalDuration = Math.max(...labels);
+      maxCommentCount = Math.max(...counts);
+
+      const ctx = document.getElementById("commentChart").getContext("2d");
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [{
+            label: "コメント数（10秒ごと）",
+            data: counts,
+            borderColor: "#42A5F5",
+            backgroundColor: "rgba(66,165,245,0.15)",
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointHoverRadius: 8,
+            pointBackgroundColor: "#42A5F5",
+            pointBorderColor: "#42A5F5",
+            pointBorderWidth: 0,
+            borderWidth: 2.5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            intersect: false,
+            mode: 'nearest'
+          },
+          onHover: (event, elements) => {
+            // スクロール中はホバー効果も無効化
+            if (!isTooltipEnabled) {
+              return;
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              position: 'bottom',
+              min: 0,
+              max: Math.min(1800, totalDuration),
+              title: { 
+                display: true, 
+                text: "経過時間",
+                font: { size: 12, weight: 'bold' }
+              },
+              ticks: {
+                callback: function(value) {
+                  return formatTime(value);
+                },
+                maxTicksLimit: 8,
+                font: { size: 11 }
+              },
+              grid: {
+                color: 'rgba(0,0,0,0.08)'
+              }
+            },
+            y: {
+              beginAtZero: true,
+              max: maxCommentCount,
+              title: { 
+                display: true, 
+                text: "コメント数",
+                font: { size: 12, weight: 'bold' }
+              },
+              ticks: {
+                font: { size: 11 }
+              },
+              grid: {
+                color: 'rgba(0,0,0,0.05)'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            zoom: {
+              pan: {
+                enabled: !isTouchDevice,
+                mode: 'x',
+                modifierKey: null,
+                onPanStart: () => {
+                  disableTooltip();
+                },
+                onPanComplete: () => {
+                  enableTooltipWithDelay(300);
+                }
+              },
+              zoom: {
+                wheel: {
+                  enabled: true,
+                  speed: 0.1,
+                  modifierKey: 'ctrl'
+                },
+                pinch: {
+                  enabled: isTouchDevice
+                },
+                mode: 'x',
+                onZoomStart: () => {
+                  disableTooltip();
+                },
+                onZoomComplete: () => {
+                  updateTimeInfo();
+                  enableTooltipWithDelay(300);
+                }
+              },
+              limits: {
+                x: { 
+                  min: 0,
+                  max: totalDuration,
+                  minRange: 60
+                },
+                y: { 
+                  min: 0,
+                  max: maxCommentCount,
+                  minRange: 1
+                }
+              }
+            },
+            tooltip: {
+              enabled: true,
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              titleColor: 'white',
+              bodyColor: 'white',
+              borderColor: '#42A5F5',
+              borderWidth: 1,
+              cornerRadius: 6,
+              displayColors: false,
+              filter: function(tooltipItem) {
+                return isTooltipEnabled && !isDragging && !isScrolling;
+              },
+              callbacks: {
+                title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
+                label: (context) => `コメント数: ${context.parsed.y}件`,
+                footer: () => isTouchDevice ? 'ダブルタップで動画のこの時間に移動' : 'ダブルクリックで動画のこの時間に移動'
+              }
+            }
+          }
+        }
+      });
+
+      updateTimeInfo();
+      
+      if (isTouchDevice) {
+        setupTouchHandling();
+        setTimeout(() => showScrollHintTemporary(), 500);
+      } else {
+        setupCustomWheelHandler();
+        setupDoubleClickHandling();
+      }
+    }
+
+    // データ読み込み
+    fetch("../chart_data/" + VIDEO_ID + "_chart.json")
+      .then(res => res.json())
+      .then(data => {
+        createChart(data);
+      })
+      .finally(() => {
+        // ボタンイベント
+        document.getElementById("zoomIn").addEventListener("click", zoomIn);
+        document.getElementById("zoomOut").addEventListener("click", zoomOut);
+        document.getElementById("resetZoom").addEventListener("click", resetZoom);
+        document.getElementById("showAll").addEventListener("click", showAll);
+        
+        // モーダルイベント
+        document.getElementById("confirmYes").addEventListener("click", () => {
+          if (pendingUrl) {
+            window.open(pendingUrl, '_blank');
+          }
+          hideConfirmModal();
+        });
+        
+        document.getElementById("confirmNo").addEventListener("click", hideConfirmModal);
+        
+        document.getElementById("confirmModal").addEventListener("click", (e) => {
+          if (e.target.id === 'confirmModal') {
+            hideConfirmModal();
+          }
+        });
+        
+        window.addEventListener('resize', () => {
+          if (chart) {
+            setTimeout(() => chart.resize(), 100);
+          }
+        });
+        
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            hideConfirmModal();
+          }
+        });
+      });
+  </script>
+  
   <style>
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       padding: 1rem;
-      background: #f9f9f9;
+      background: #f5f5f5;
+      margin: 0;
       overflow-x: hidden;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #333;
     }
 
     #chart-container {
       position: relative;
-      height: 400px;
-      max-width: 100vw; /* 追加 */
-      overflow-x: auto;
+      height: 50vh;
+      min-height: 300px;
+      max-height: 600px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+      padding: 15px;
+      box-sizing: border-box;
+      overflow: hidden;
+      touch-action: pan-y;
     }
 
     canvas {
-      background: white;
+      background: transparent;
+      width: 100% !important;
+      height: 100% !important;
+      cursor: pointer;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border: none;
       border-radius: 8px;
-      padding: 10px;
-      box-sizing: border-box; /* 追加 */
-      width: 100%;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+      box-sizing: border-box;
+      touch-action: manipulation;
     }
 
     #resetZoom {
-      margin-top: 1rem;
-      padding: 6px 12px;
       background: #42A5F5;
       color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 14px;
-      cursor: pointer;
     }
 
     #resetZoom:hover {
       background: #1E88E5;
+      transform: translateY(-1px);
+    }
+
+    #showAll {
+      background: #4CAF50;
+      color: white;
+    }
+
+    #showAll:hover {
+      background: #45a049;
+      transform: translateY(-1px);
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .zoom-btn {
+      background: #666;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+      touch-action: manipulation;
+    }
+
+    .zoom-btn:hover {
+      background: #555;
+    }
+
+    .time-info {
+      background: rgba(66, 165, 245, 0.1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #333;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .instructions {
+      margin-top: 1rem;
+      padding: 12px;
+      background: rgba(66, 165, 245, 0.1);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #555;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .mobile-only {
+      display: none;
+    }
+
+    .desktop-only {
+      display: inline;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      backdrop-filter: blur(3px);
+      touch-action: manipulation;
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 50% auto;
+      transform: translateY(-50%);
+      padding: 20px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .modal-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      min-width: 80px;
+      transition: all 0.2s;
+      touch-action: manipulation;
+    }
+
+    .modal-btn.confirm {
+      background: #FF4444;
+      color: white;
+    }
+
+    .modal-btn.confirm:hover {
+      background: #CC3333;
+    }
+
+    .modal-btn.cancel {
+      background: #eee;
+      color: #333;
+    }
+
+    .modal-btn.cancel:hover {
+      background: #ddd;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .scroll-hint.show {
+      opacity: 1;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 0.5rem;
+      }
+      
+      .header {
+        font-size: 1.1rem;
+      }
+      
+      #chart-container {
+        height: 45vh;
+        min-height: 280px;
+        padding: 12px;
+        touch-action: pan-y pinch-zoom;
+      }
+
+      canvas {
+        touch-action: none;
+      }
+      
+      .btn {
+        font-size: 13px;
+        padding: 8px 14px;
+      }
+      
+      .instructions {
+        font-size: 12px;
+      }
+
+      .mobile-only {
+        display: inline;
+      }
+
+      .desktop-only {
+        display: none;
+      }
+
+      .modal-content {
+        margin: 40% auto;
+        width: 95%;
+        padding: 16px;
+      }
+
+      .scroll-hint {
+        bottom: 12px;
+        font-size: 11px;
+        padding: 6px 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #chart-container {
+        height: 40vh;
+        min-height: 250px;
+      }
     }
   </style>
-</head>
-<body>
-  <div id="chart-container">
-    <canvas id="commentChart"></canvas>
-  </div>
-  <button id="resetZoom">🔄 ズームをリセット</button>
-
-  <script>
-    const VIDEO_ID = "drz5fvV_ykk";
-
-    fetch("../chart_data/" + VIDEO_ID + "_chart.json")
-      .then(res => res.json())
-      .then(data => {
-        const labels = data.map(d => d.time);
-        const counts = data.map(d => d.count);
-
-        const ctx = document.getElementById("commentChart").getContext("2d");
-
-        const chart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: labels,
-            datasets: [{
-              label: "コメント数（10秒ごと）",
-              data: counts,
-              borderColor: "#42A5F5",
-              backgroundColor: "rgba(66,165,245,0.2)",
-              fill: true,
-              tension: 0.3,
-              pointRadius: 2,
-              pointHoverRadius: 5
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                title: { display: true, text: "経過時間（秒）" }
-              },
-              y: {
-                beginAtZero: true,
-                title: { display: true, text: "コメント数" }
-              }
-            },
-            plugins: {
-              zoom: {
-                pan: {
-                  enabled: true,
-                  mode: 'x',
-                  modifierKey: null // スマホでも有効
-                },
-                zoom: {
-                  wheel: {
-                    enabled: true
-                  },
-                  pinch: {
-                    enabled: true
-                  },
-                  mode: 'x'
-                },
-                limits: {
-                  x: { min: 'original', max: 'original' },
-                  y: { min: 0 }
-                }
-              },
-              tooltip: {
-                callbacks: {
-                  label: context => `コメント数: ${context.parsed.y}`
-                }
-              }
-            }
-          }
-        });
-
-        // リセットボタン
-        document.getElementById("resetZoom").addEventListener("click", () => {
-          chart.resetZoom();
-        });
-      })
-      .catch(error => {
-        console.error('データの読み込みに失敗しました:', error);
-        document.getElementById('chart-container').innerHTML = 
-          '<p style="text-align:center; color:#666;">データの読み込みに失敗しました</p>';
-      });
-  </script>
 </body>
 </html>
