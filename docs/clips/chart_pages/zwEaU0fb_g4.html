@@ -67,6 +67,7 @@
     let isScrolling = false;
     let hasMoved = false;
     let isTooltipEnabled = true;
+    let tooltipHideTimeout = null;
 
     // デバッグ情報表示
     function debugLog(message) {
@@ -78,6 +79,28 @@
       if (logs.length > 10) {
         debugDiv.removeChild(logs[logs.length - 1]);
       }
+    }
+
+    // ツールチップの表示制御
+    function disableTooltip() {
+      isTooltipEnabled = false;
+      if (chart && chart.tooltip) {
+        chart.tooltip.setActiveElements([], {x: 0, y: 0});
+        chart.update('none');
+      }
+      // 既存のタイマーをクリア
+      if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+      }
+    }
+
+    function enableTooltipWithDelay(delay = 300) {
+      if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+      }
+      tooltipHideTimeout = setTimeout(() => {
+        isTooltipEnabled = true;
+      }, delay);
     }
 
     // デバイス判定
@@ -246,16 +269,22 @@
         
         if (e.ctrlKey) {
           // Ctrl+ホイール：ズーム（Chart.jsのデフォルト動作を使用）
+          disableTooltip();
+          enableTooltipWithDelay(500);
           return;
         } else {
           // 通常のホイール：パン
           e.preventDefault();
           
+          // ツールチップを無効化
+          disableTooltip();
+          
           const deltaX = e.deltaX;
           const deltaY = e.deltaY;
           
           const scrollDelta = deltaX !== 0 ? deltaX : deltaY;
-          const scrollSensitivity = range * 0.05;
+          // PC用のスクロール感度を下げる
+          const scrollSensitivity = range * 0.03; // 0.05から0.03に変更
           const timeShift = (scrollDelta > 0 ? 1 : -1) * scrollSensitivity;
           
           const newMin = Math.max(0, currentMin + timeShift);
@@ -266,11 +295,14 @@
           chart.update('none');
           
           updateTimeInfo();
+          
+          // スクロール後に少し遅延してツールチップを再有効化
+          enableTooltipWithDelay(300);
         }
       }, { passive: false });
     }
 
-    // タッチハンドリング（スマホ用）- 改善版
+    // タッチハンドリング（スマホ用）- 感度調整版
     function setupTouchHandling() {
       if (!isTouchDevice) return;
       
@@ -313,6 +345,9 @@
           isDragging = true;
           isScrolling = true;
           
+          // スクロール開始時にツールチップを無効化
+          disableTooltip();
+          
           if (chart && chart.scales.x) {
             const xScale = chart.scales.x;
             const currentMin = xScale.min || 0;
@@ -320,7 +355,11 @@
             const range = currentMax - currentMin;
             const rect = canvas.getBoundingClientRect();
             const canvasWidth = rect.width;
-            const pixelRatio = range / canvasWidth;
+            
+            // スマホ用のスクロール感度を大幅に下げる
+            const basePixelRatio = range / canvasWidth;
+            const sensitivityFactor = 0.3; // 感度を30%に削減（元は100%）
+            const pixelRatio = basePixelRatio * sensitivityFactor;
             const timeShift = -deltaX * pixelRatio;
             
             const newMin = Math.max(0, currentMin + timeShift);
@@ -375,6 +414,11 @@
           } else {
             debugLog('No data point found at tap position');
           }
+        }
+        
+        // スクロール終了時にツールチップを再有効化（少し遅延）
+        if (isDragging || isScrolling) {
+          enableTooltipWithDelay(500);
         }
         
         // 状態をリセット
@@ -442,6 +486,12 @@
               showConfirmModal(timeInSeconds);
             }
           },
+          onHover: (event, elements) => {
+            // スクロール中はホバー効果も無効化
+            if (!isTooltipEnabled) {
+              return;
+            }
+          },
           scales: {
             x: {
               type: 'linear',
@@ -488,7 +538,13 @@
               pan: {
                 enabled: !isTouchDevice,
                 mode: 'x',
-                modifierKey: null
+                modifierKey: null,
+                onPanStart: () => {
+                  disableTooltip();
+                },
+                onPanComplete: () => {
+                  enableTooltipWithDelay(300);
+                }
               },
               zoom: {
                 wheel: {
@@ -500,8 +556,12 @@
                   enabled: isTouchDevice
                 },
                 mode: 'x',
+                onZoomStart: () => {
+                  disableTooltip();
+                },
                 onZoomComplete: () => {
                   updateTimeInfo();
+                  enableTooltipWithDelay(300);
                 }
               },
               limits: {
