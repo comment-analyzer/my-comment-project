@@ -51,7 +51,6 @@
   </style>
 </head>
 <body>
-  <h2>📈 コメントの盛り上がり</h2>
   <div id="chart-container">
     <canvas id="commentChart"></canvas>
   </div>
@@ -60,7 +59,7 @@
   <script>
     const VIDEO_ID = "{{VIDEO_ID}}";
 
-    fetch("../clips/chart_data/" + VIDEO_ID + "_chart.json")
+    fetch("../chart_data/" + VIDEO_ID + "_chart.json")
       .then(res => res.json())
       .then(data => {
         const labels = data.map(d => d.time);
@@ -121,18 +120,7 @@
                   label: context => `コメント数: ${context.parsed.y}`
                 }
               }
-            },
-            onClick: (event, elements) => {
-              if (elements.length > 0) {
-                const index = elements[0].index;
-                const sec = labels[index];
-                const url = `https://www.youtube.com/watch?v=${VIDEO_ID}&t=${sec}s`;
-                if (confirm(`${sec}秒地点にジャンプしますか？\n\n${url}`)) {
-                  window.open(url, "_blank");
-                }
-              }
             }
-          }
         });
 
         // リセットボタン
