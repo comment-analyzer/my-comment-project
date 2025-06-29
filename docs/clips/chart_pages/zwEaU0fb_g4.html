@@ -17,6 +17,15 @@
   <div id="chart-container">
     <canvas id="commentChart"></canvas>
     <div id="scrollHint" class="scroll-hint">← スワイプで時間軸を移動 →</div>
+    
+    <!-- YouTube ポップアッププレイヤー -->
+    <div id="youtubePlayer" class="youtube-player">
+      <div class="player-header">
+        <span class="player-title">YouTube動画プレイヤー</span>
+        <button id="closePlayer" class="close-player">×</button>
+      </div>
+      <iframe id="youtubeIframe" width="100%" height="200" frameborder="0" allowfullscreen></iframe>
+    </div>
   </div>
   
   <div id="timeInfo" class="time-info"></div>
@@ -32,18 +41,18 @@
   
   <div class="instructions">
     📱 <strong>操作方法：</strong><br>
-    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム</span>
-    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能</span><br>
-    グラフの点をタップ/クリックすると該当時間のYouTube動画に移動
+    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム、ダブルタップで動画再生</span>
+    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能、ダブルクリックで動画再生</span><br>
+    グラフの点をダブルタップ/クリックすると該当時間のYouTube動画がポップアップで再生
   </div>
 
   <!-- 確認モーダル -->
   <div id="confirmModal" class="modal">
     <div class="modal-content">
-      <h3>🎬 YouTube動画を開きますか？</h3>
+      <h3>🎬 YouTube動画を再生しますか？</h3>
       <p id="modalTime"></p>
       <div class="modal-buttons">
-        <button id="confirmYes" class="modal-btn confirm">開く</button>
+        <button id="confirmYes" class="modal-btn confirm">再生</button>
         <button id="confirmNo" class="modal-btn cancel">キャンセル</button>
       </div>
     </div>
@@ -52,19 +61,21 @@
   <script>
     const VIDEO_ID = "zwEaU0fb_g4";
     let chart;
-    let pendingUrl = null;
+    let pendingTimeInSeconds = null;
     let chartData = [];
     let totalDuration = 0;
     let maxCommentCount = 0; // 縦軸固定用の最大値
     
     // タッチ操作の状態管理
     let touchStartTime = 0;
-    let touchStartX = 0;
+    let touchStartX = 0;    
     let touchStartY = 0;
     let isDragging = false;
     let isScrolling = false;
     let clickTimeout = null;
     let isTooltipEnabled = true;
+    let lastTapTime = 0;
+    let tapCount = 0;
 
     // デバイス判定
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -104,9 +115,37 @@
         `表示範囲: ${formatTime(min)} 〜 ${formatTime(max)} (${rangeText})`;
     }
 
-    // YouTube URLを生成
-    function generateYouTubeUrl(videoId, timeInSeconds) {
-      return `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(timeInSeconds)}s`;
+    // YouTube Embed URLを生成
+    function generateYouTubeEmbedUrl(videoId, timeInSeconds) {
+      return `https://www.youtube.com/embed/${videoId}?start=${Math.floor(timeInSeconds)}&autoplay=1`;
+    }
+
+    // YouTube プレイヤーを表示
+    function showYouTubePlayer(timeInSeconds) {
+      const player = document.getElementById('youtubePlayer');
+      const iframe = document.getElementById('youtubeIframe');
+      
+      iframe.src = generateYouTubeEmbedUrl(VIDEO_ID, timeInSeconds);
+      player.style.display = 'block';
+      
+      // プレイヤーが表示されたらアニメーション
+      setTimeout(() => {
+        player.classList.add('show');
+      }, 10);
+    }
+
+    // YouTube プレイヤーを非表示
+    function hideYouTubePlayer() {
+      const player = document.getElementById('youtubePlayer');
+      const iframe = document.getElementById('youtubeIframe');
+      
+      player.classList.remove('show');
+      
+      // アニメーション完了後にiframeをクリア
+      setTimeout(() => {
+        player.style.display = 'none';
+        iframe.src = '';
+      }, 300);
     }
 
     // モーダル表示
@@ -115,14 +154,14 @@
       const modalTime = document.getElementById('modalTime');
       
       modalTime.textContent = `動画の ${formatTime(timeInSeconds)} から再生します`;
-      pendingUrl = generateYouTubeUrl(VIDEO_ID, timeInSeconds);
+      pendingTimeInSeconds = timeInSeconds;
       modal.style.display = 'block';
     }
 
     // モーダル非表示
     function hideConfirmModal() {
       document.getElementById('confirmModal').style.display = 'none';
-      pendingUrl = null;
+      pendingTimeInSeconds = null;
     }
 
     // ツールチップの有効/無効制御
@@ -216,9 +255,9 @@
     function setupCustomWheelHandler() {
       if (isTouchDevice) return; // タッチデバイスでは無効
       
-      const canvas = document.getElementById('commentChart');
+      const chartContainer = document.getElementById('chart-container');
       
-      canvas.addEventListener('wheel', function(e) {
+      chartContainer.addEventListener('wheel', function(e) {
         if (!chart) return;
         
         const xScale = chart.scales.x;
@@ -232,6 +271,7 @@
         } else {
           // 通常のホイール：パン
           e.preventDefault();
+          e.stopPropagation();
           
           const deltaX = e.deltaX;
           const deltaY = e.deltaY;
@@ -251,6 +291,40 @@
           updateTimeInfo();
         }
       }, { passive: false });
+    }
+
+    // PC版ダブルクリック処理
+    function setupPCDoubleClick() {
+      if (isTouchDevice) return;
+      
+      const canvas = document.getElementById('commentChart');
+      let clickCount = 0;
+      let clickTimer = null;
+      
+      canvas.addEventListener('click', function(e) {
+        if (isDragging || isScrolling || !isTooltipEnabled) {
+          return;
+        }
+        
+        clickCount++;
+        
+        if (clickCount === 1) {
+          clickTimer = setTimeout(() => {
+            clickCount = 0;
+          }, 300);
+        } else if (clickCount === 2) {
+          clearTimeout(clickTimer);
+          clickCount = 0;
+          
+          // ダブルクリック処理
+          const elements = chart.getElementsAtEventForMode(e, 'nearest', { intersect: false }, false);
+          if (elements.length > 0) {
+            const elementIndex = elements[0].index;
+            const timeInSeconds = chartData[elementIndex].time;
+            showConfirmModal(timeInSeconds);
+          }
+        }
+      });
     }
 
     // タッチハンドリング（スマホ用）
@@ -330,23 +404,36 @@
         const isTap = touchDuration < 300 && totalDistance < 15;
         
         if (isTap && !isMoving) {
-          // タップとして処理
-          const rect = canvas.getBoundingClientRect();
-          const x = e.changedTouches[0].clientX - rect.left;
-          const y = e.changedTouches[0].clientY - rect.top;
+          // ダブルタップ判定
+          const currentTime = Date.now();
+          const timeSinceLastTap = currentTime - lastTapTime;
           
-          // Chart.jsのgetElementsAtEventを使用
-          const elements = chart.getElementsAtEventForMode(
-            { x: x, y: y }, 
-            'nearest', 
-            { intersect: false }, 
-            false
-          );
-          
-          if (elements.length > 0) {
-            const elementIndex = elements[0].index;
-            const timeInSeconds = chartData[elementIndex].time;
-            showConfirmModal(timeInSeconds);
+          if (timeSinceLastTap < 500) {
+            // ダブルタップとして処理
+            tapCount = 0;
+            lastTapTime = 0;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.changedTouches[0].clientX - rect.left;
+            const y = e.changedTouches[0].clientY - rect.top;
+            
+            // Chart.jsのgetElementsAtEventを使用
+            const elements = chart.getElementsAtEventForMode(
+              { x: x, y: y }, 
+              'nearest', 
+              { intersect: false }, 
+              false
+            );
+            
+            if (elements.length > 0) {
+              const elementIndex = elements[0].index;
+              const timeInSeconds = chartData[elementIndex].time;
+              showConfirmModal(timeInSeconds);
+            }
+          } else {
+            // 初回タップ
+            tapCount = 1;
+            lastTapTime = currentTime;
           }
         }
         
@@ -367,7 +454,10 @@
       const labels = data.map(d => d.time);
       const counts = data.map(d => d.count);
       totalDuration = Math.max(...labels);
-      maxCommentCount = Math.max(...counts); // 縦軸固定用の最大値を計算
+      maxCommentCount = Math.max(...counts);
+      
+      // 縦軸の最大値に余裕を持たせる（10%の余裕 + 最低でも5の余裕）
+      const yAxisMax = Math.max(maxCommentCount * 1.1, maxCommentCount + 5);
 
       const ctx = document.getElementById("commentChart").getContext("2d");
 
@@ -397,20 +487,6 @@
             intersect: false,
             mode: 'nearest'
           },
-          onClick: (event, elements) => {
-            // PC版でのクリック処理
-            if (isTouchDevice) return; // タッチデバイスでは無効
-            
-            if (isDragging || isScrolling || !isTooltipEnabled) {
-              return;
-            }
-            
-            if (elements.length > 0) {
-              const elementIndex = elements[0].index;
-              const timeInSeconds = labels[elementIndex];
-              showConfirmModal(timeInSeconds);
-            }
-          },
           scales: {
             x: {
               type: 'linear',
@@ -435,7 +511,7 @@
             },
             y: {
               beginAtZero: true,
-              max: maxCommentCount, // 縦軸の最大値を固定
+              max: yAxisMax, // 余裕を持たせた最大値
               title: { 
                 display: true, 
                 text: "コメント数",
@@ -481,7 +557,7 @@
                 },
                 y: { 
                   min: 0,
-                  max: maxCommentCount, // 縦軸の制限も固定
+                  max: yAxisMax,
                   minRange: 1
                 }
               }
@@ -501,7 +577,7 @@
               callbacks: {
                 title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
                 label: (context) => `コメント数: ${context.parsed.y}件`,
-                footer: () => isTouchDevice ? 'タップで動画のこの時間に移動' : 'クリックで動画のこの時間に移動'
+                footer: () => isTouchDevice ? 'ダブルタップで動画のこの時間に移動' : 'ダブルクリックで動画のこの時間に移動'
               }
             }
           }
@@ -518,6 +594,7 @@
         setTimeout(() => showScrollHintTemporary(), 500);
       } else {
         setupCustomWheelHandler();
+        setupPCDoubleClick();
       }
     }
 
@@ -533,10 +610,13 @@
         document.getElementById("resetZoom").addEventListener("click", resetZoom);
         document.getElementById("showAll").addEventListener("click", showAll);
         
+        // YouTubeプレイヤーイベント
+        document.getElementById("closePlayer").addEventListener("click", hideYouTubePlayer);
+        
         // モーダルイベント
         document.getElementById("confirmYes").addEventListener("click", () => {
-          if (pendingUrl) {
-            window.open(pendingUrl, '_blank');
+          if (pendingTimeInSeconds !== null) {
+            showYouTubePlayer(pendingTimeInSeconds);
           }
           hideConfirmModal();
         });
@@ -560,6 +640,7 @@
         document.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
             hideConfirmModal();
+            hideYouTubePlayer();
           }
         });
       })
