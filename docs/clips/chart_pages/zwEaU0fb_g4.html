@@ -55,13 +55,14 @@
     let chartData = [];
     let totalDuration = 0;
     
-    // タッチ操作の判定用変数
+    // タッチ操作の状態管理
     let touchStartTime = 0;
     let touchStartX = 0;
     let touchStartY = 0;
     let isDragging = false;
     let isScrolling = false;
     let clickTimeout = null;
+    let isTooltipEnabled = true;
 
     // 時間フォーマット関数
     function formatTime(seconds) {
@@ -117,6 +118,31 @@
     function hideConfirmModal() {
       document.getElementById('confirmModal').style.display = 'none';
       pendingUrl = null;
+    }
+
+    // ツールチップの有効/無効制御
+    function disableTooltip() {
+      if (chart) {
+        isTooltipEnabled = false;
+        chart.options.plugins.tooltip.enabled = false;
+        chart.options.interaction.intersect = false;
+        chart.options.interaction.mode = 'none';
+        // 既存のツールチップを強制的に非表示
+        if (chart.tooltip) {
+          chart.tooltip.opacity = 0;
+        }
+        chart.update('none');
+      }
+    }
+
+    function enableTooltip() {
+      if (chart) {
+        isTooltipEnabled = true;
+        chart.options.plugins.tooltip.enabled = true;
+        chart.options.interaction.intersect = false;
+        chart.options.interaction.mode = 'nearest';
+        chart.update('none');
+      }
     }
 
     // ズーム・パン操作
@@ -182,22 +208,8 @@
       setTimeout(hideScrollHint, duration);
     }
 
-    // デバッグ用ログ関数
-    function debugLog(message, data = '') {
-      console.log(`[Debug] ${message}`, data);
-      // 画面にも表示（デバッグ用）
-      const debugDiv = document.getElementById('debug-info') || (() => {
-        const div = document.createElement('div');
-        div.id = 'debug-info';
-        div.style.cssText = 'position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.8);color:white;padding:10px;border-radius:5px;font-size:12px;z-index:9999;max-width:300px;';
-        document.body.appendChild(div);
-        return div;
-      })();
-      debugDiv.innerHTML = `${message}<br>${JSON.stringify(data)}`;
-    }
-
-    // シンプルなタッチハンドリング（デバッグ用）
-    function setupSimpleTouchHandling() {
+    // タッチハンドリング
+    function setupTouchHandling() {
       const canvas = document.getElementById('commentChart');
       
       let lastX = 0;
@@ -207,8 +219,19 @@
       canvas.addEventListener('touchstart', function(e) {
         startX = lastX = e.touches[0].clientX;
         isMoving = false;
-        debugLog('Touch Start', { x: startX });
-        e.preventDefault(); // ページスクロールを防ぐ
+        isDragging = false;
+        isScrolling = false;
+        
+        // ツールチップを即座に無効化
+        disableTooltip();
+        
+        // クリックタイマーをクリア
+        if (clickTimeout) {
+          clearTimeout(clickTimeout);
+          clickTimeout = null;
+        }
+        
+        e.preventDefault();
       }, { passive: false });
       
       canvas.addEventListener('touchmove', function(e) {
@@ -218,6 +241,8 @@
         
         if (totalDelta > 10) {
           isMoving = true;
+          isDragging = true;
+          isScrolling = true;
           
           // Chart.jsのパン操作を手動で実行
           if (chart && chart.scales.x) {
@@ -227,24 +252,17 @@
             const range = currentMax - currentMin;
             const canvasWidth = canvas.width;
             const pixelRatio = range / canvasWidth;
-            const timeShift = -deltaX * pixelRatio * 2; // 感度調整
+            const timeShift = -deltaX * pixelRatio * 2;
             
             const newMin = Math.max(0, currentMin + timeShift);
             const newMax = Math.min(totalDuration, currentMax + timeShift);
             
             chart.options.scales.x.min = newMin;
             chart.options.scales.x.max = newMax;
-            chart.update('none'); // アニメーションなしで更新
+            chart.update('none');
             
             updateTimeInfo();
             showScrollHint();
-            
-            debugLog('Manual Pan', { 
-              deltaX, 
-              timeShift: timeShift.toFixed(1), 
-              newMin: newMin.toFixed(1), 
-              newMax: newMax.toFixed(1) 
-            });
           }
         }
         
@@ -253,8 +271,15 @@
       }, { passive: false });
       
       canvas.addEventListener('touchend', function(e) {
-        debugLog('Touch End', { wasMoving: isMoving });
         setTimeout(hideScrollHint, 1000);
+        
+        // タッチ終了後、少し遅延してからツールチップを再有効化
+        setTimeout(() => {
+          isDragging = false;
+          isScrolling = false;
+          enableTooltip();
+        }, 300);
+        
         e.preventDefault();
       }, { passive: false });
     }
@@ -295,8 +320,8 @@
             mode: 'nearest'
           },
           onClick: (event, elements) => {
-            // ドラッグやスクロール中はクリックを無視
-            if (isDragging || isScrolling) {
+            // ドラッグやスクロール中、またはツールチップが無効の場合はクリックを無視
+            if (isDragging || isScrolling || !isTooltipEnabled) {
               return;
             }
             
@@ -308,7 +333,7 @@
               const isTouchDevice = 'ontouchstart' in window;
               if (isTouchDevice) {
                 clickTimeout = setTimeout(() => {
-                  if (!isDragging && !isScrolling) {
+                  if (!isDragging && !isScrolling && isTooltipEnabled) {
                     showConfirmModal(timeInSeconds);
                   }
                 }, 150);
@@ -360,7 +385,7 @@
             },
             zoom: {
               pan: {
-                enabled: false, // Chart.jsのパン機能を無効化
+                enabled: false,
                 mode: 'x',
                 modifierKey: null
               },
@@ -375,7 +400,6 @@
                 mode: 'x',
                 onZoomComplete: () => {
                   updateTimeInfo();
-                  debugLog('Zoom Complete');
                 }
               },
               limits: {
@@ -391,6 +415,7 @@
               }
             },
             tooltip: {
+              enabled: true,
               backgroundColor: 'rgba(0,0,0,0.8)',
               titleColor: 'white',
               bodyColor: 'white',
@@ -398,6 +423,10 @@
               borderWidth: 1,
               cornerRadius: 6,
               displayColors: false,
+              filter: function(tooltipItem) {
+                // ツールチップが無効化されている場合は表示しない
+                return isTooltipEnabled;
+              },
               callbacks: {
                 title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
                 label: (context) => `コメント数: ${context.parsed.y}件`,
@@ -411,8 +440,8 @@
       // 初期の時間情報を表示
       updateTimeInfo();
       
-      // スマートタッチハンドリングを設定
-      setupSimpleTouchHandling();
+      // タッチハンドリングを設定
+      setupTouchHandling();
       
       // 初期表示時にスクロールヒントを表示
       setTimeout(() => showScrollHintTemporary(), 500);
@@ -474,7 +503,6 @@
       padding: 1rem;
       background: #f5f5f5;
       margin: 0;
-      /* ページ全体のスクロールを維持 */
       overflow-x: hidden;
     }
 
@@ -497,7 +525,6 @@
       padding: 15px;
       box-sizing: border-box;
       overflow: hidden;
-      /* チャート内では水平パンのみ許可 */
       touch-action: pan-y pinch-zoom;
     }
 
@@ -506,7 +533,6 @@
       width: 100% !important;
       height: 100% !important;
       cursor: pointer;
-      /* キャンバスではタッチ操作を完全に制御 */
       touch-action: none;
     }
 
