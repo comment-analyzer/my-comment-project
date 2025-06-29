@@ -32,8 +32,9 @@
   
   <div class="instructions">
     📱 <strong>操作方法：</strong><br>
-    横スワイプで時間軸を移動、+/−ボタンでズーム<br>
-    グラフの点をタップすると該当時間のYouTube動画に移動
+    <span class="mobile-only">横スワイプで時間軸を移動、+/−ボタンでズーム</span>
+    <span class="desktop-only">マウスホイールで横スクロール、Ctrl+ホイールでズーム、ドラッグでも移動可能</span><br>
+    グラフの点をタップ/クリックすると該当時間のYouTube動画に移動
   </div>
 
   <!-- 確認モーダル -->
@@ -54,6 +55,7 @@
     let pendingUrl = null;
     let chartData = [];
     let totalDuration = 0;
+    let maxCommentCount = 0; // 縦軸固定用の最大値
     
     // タッチ操作の状態管理
     let touchStartTime = 0;
@@ -63,6 +65,9 @@
     let isScrolling = false;
     let clickTimeout = null;
     let isTooltipEnabled = true;
+
+    // デバイス判定
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     // 時間フォーマット関数
     function formatTime(seconds) {
@@ -127,7 +132,6 @@
         chart.options.plugins.tooltip.enabled = false;
         chart.options.interaction.intersect = false;
         chart.options.interaction.mode = 'none';
-        // 既存のツールチップを強制的に非表示
         if (chart.tooltip) {
           chart.tooltip.opacity = 0;
         }
@@ -208,22 +212,64 @@
       setTimeout(hideScrollHint, duration);
     }
 
-    // タッチハンドリング
+    // カスタムホイールイベント処理（PC用）
+    function setupCustomWheelHandler() {
+      if (isTouchDevice) return; // タッチデバイスでは無効
+      
+      const canvas = document.getElementById('commentChart');
+      
+      canvas.addEventListener('wheel', function(e) {
+        if (!chart) return;
+        
+        const xScale = chart.scales.x;
+        const currentMin = xScale.min || 0;
+        const currentMax = xScale.max || totalDuration;
+        const range = currentMax - currentMin;
+        
+        if (e.ctrlKey) {
+          // Ctrl+ホイール：ズーム（Chart.jsのデフォルト動作を使用）
+          return;
+        } else {
+          // 通常のホイール：パン
+          e.preventDefault();
+          
+          const deltaX = e.deltaX;
+          const deltaY = e.deltaY;
+          
+          // 横スクロールまたは縦スクロールをパンに変換
+          const scrollDelta = deltaX !== 0 ? deltaX : deltaY;
+          const scrollSensitivity = range * 0.05; // スクロール感度
+          const timeShift = (scrollDelta > 0 ? 1 : -1) * scrollSensitivity;
+          
+          const newMin = Math.max(0, currentMin + timeShift);
+          const newMax = Math.min(totalDuration, currentMax + timeShift);
+          
+          chart.options.scales.x.min = newMin;
+          chart.options.scales.x.max = newMax;
+          chart.update('none');
+          
+          updateTimeInfo();
+        }
+      }, { passive: false });
+    }
+
+    // タッチハンドリング（スマホ用）
     function setupTouchHandling() {
+      if (!isTouchDevice) return; // PC版では無効
+      
       const canvas = document.getElementById('commentChart');
       
       let lastX = 0;
       let startX = 0;
+      let startTime = 0;
       let isMoving = false;
       
       canvas.addEventListener('touchstart', function(e) {
         startX = lastX = e.touches[0].clientX;
+        startTime = Date.now();
         isMoving = false;
         isDragging = false;
         isScrolling = false;
-        
-        // ツールチップを即座に無効化
-        disableTooltip();
         
         // クリックタイマーをクリア
         if (clickTimeout) {
@@ -239,10 +285,13 @@
         const deltaX = currentX - lastX;
         const totalDelta = Math.abs(currentX - startX);
         
-        if (totalDelta > 10) {
+        if (totalDelta > 15) { // 移動閾値を調整
           isMoving = true;
           isDragging = true;
           isScrolling = true;
+          
+          // ツールチップを無効化
+          disableTooltip();
           
           // Chart.jsのパン操作を手動で実行
           if (chart && chart.scales.x) {
@@ -271,14 +320,42 @@
       }, { passive: false });
       
       canvas.addEventListener('touchend', function(e) {
+        const endTime = Date.now();
+        const touchDuration = endTime - startTime;
+        const totalDistance = Math.abs(e.changedTouches[0].clientX - startX);
+        
         setTimeout(hideScrollHint, 1000);
         
-        // タッチ終了後、少し遅延してからツールチップを再有効化
+        // タップ判定：短時間 + 小さな移動距離
+        const isTap = touchDuration < 300 && totalDistance < 15;
+        
+        if (isTap && !isMoving) {
+          // タップとして処理
+          const rect = canvas.getBoundingClientRect();
+          const x = e.changedTouches[0].clientX - rect.left;
+          const y = e.changedTouches[0].clientY - rect.top;
+          
+          // Chart.jsのgetElementsAtEventを使用
+          const elements = chart.getElementsAtEventForMode(
+            { x: x, y: y }, 
+            'nearest', 
+            { intersect: false }, 
+            false
+          );
+          
+          if (elements.length > 0) {
+            const elementIndex = elements[0].index;
+            const timeInSeconds = chartData[elementIndex].time;
+            showConfirmModal(timeInSeconds);
+          }
+        }
+        
+        // タッチ終了後、遅延してからツールチップを再有効化
         setTimeout(() => {
           isDragging = false;
           isScrolling = false;
           enableTooltip();
-        }, 300);
+        }, 200);
         
         e.preventDefault();
       }, { passive: false });
@@ -290,6 +367,7 @@
       const labels = data.map(d => d.time);
       const counts = data.map(d => d.count);
       totalDuration = Math.max(...labels);
+      maxCommentCount = Math.max(...counts); // 縦軸固定用の最大値を計算
 
       const ctx = document.getElementById("commentChart").getContext("2d");
 
@@ -320,7 +398,9 @@
             mode: 'nearest'
           },
           onClick: (event, elements) => {
-            // ドラッグやスクロール中、またはツールチップが無効の場合はクリックを無視
+            // PC版でのクリック処理
+            if (isTouchDevice) return; // タッチデバイスでは無効
+            
             if (isDragging || isScrolling || !isTooltipEnabled) {
               return;
             }
@@ -328,18 +408,7 @@
             if (elements.length > 0) {
               const elementIndex = elements[0].index;
               const timeInSeconds = labels[elementIndex];
-              
-              // タッチデバイスの場合は遅延処理
-              const isTouchDevice = 'ontouchstart' in window;
-              if (isTouchDevice) {
-                clickTimeout = setTimeout(() => {
-                  if (!isDragging && !isScrolling && isTooltipEnabled) {
-                    showConfirmModal(timeInSeconds);
-                  }
-                }, 150);
-              } else {
-                showConfirmModal(timeInSeconds);
-              }
+              showConfirmModal(timeInSeconds);
             }
           },
           scales: {
@@ -366,6 +435,7 @@
             },
             y: {
               beginAtZero: true,
+              max: maxCommentCount, // 縦軸の最大値を固定
               title: { 
                 display: true, 
                 text: "コメント数",
@@ -385,17 +455,18 @@
             },
             zoom: {
               pan: {
-                enabled: false,
+                enabled: !isTouchDevice, // PCでのみ有効
                 mode: 'x',
                 modifierKey: null
               },
               zoom: {
                 wheel: {
                   enabled: true,
-                  speed: 0.1
+                  speed: 0.1,
+                  modifierKey: 'ctrl' // Ctrl+ホイールでズーム
                 },
                 pinch: {
-                  enabled: true
+                  enabled: isTouchDevice // タッチデバイスでのみ有効
                 },
                 mode: 'x',
                 onZoomComplete: () => {
@@ -410,6 +481,7 @@
                 },
                 y: { 
                   min: 0,
+                  max: maxCommentCount, // 縦軸の制限も固定
                   minRange: 1
                 }
               }
@@ -424,13 +496,12 @@
               cornerRadius: 6,
               displayColors: false,
               filter: function(tooltipItem) {
-                // ツールチップが無効化されている場合は表示しない
                 return isTooltipEnabled;
               },
               callbacks: {
                 title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
                 label: (context) => `コメント数: ${context.parsed.y}件`,
-                footer: () => 'タップで動画のこの時間に移動'
+                footer: () => isTouchDevice ? 'タップで動画のこの時間に移動' : 'クリックで動画のこの時間に移動'
               }
             }
           }
@@ -440,11 +511,14 @@
       // 初期の時間情報を表示
       updateTimeInfo();
       
-      // タッチハンドリングを設定
-      setupTouchHandling();
-      
-      // 初期表示時にスクロールヒントを表示
-      setTimeout(() => showScrollHintTemporary(), 500);
+      // デバイスに応じたハンドリングを設定
+      if (isTouchDevice) {
+        setupTouchHandling();
+        // 初期表示時にスクロールヒントを表示
+        setTimeout(() => showScrollHintTemporary(), 500);
+      } else {
+        setupCustomWheelHandler();
+      }
     }
 
     // データ読み込み
@@ -525,7 +599,7 @@
       padding: 15px;
       box-sizing: border-box;
       overflow: hidden;
-      touch-action: pan-y pinch-zoom;
+      touch-action: pan-y;
     }
 
     canvas {
@@ -533,7 +607,6 @@
       width: 100% !important;
       height: 100% !important;
       cursor: pointer;
-      touch-action: none;
     }
 
     .controls {
@@ -623,6 +696,14 @@
       color: #555;
       text-align: center;
       line-height: 1.4;
+    }
+
+    .mobile-only {
+      display: none;
+    }
+
+    .desktop-only {
+      display: inline;
     }
 
     .modal {
@@ -722,6 +803,11 @@
         height: 45vh;
         min-height: 280px;
         padding: 12px;
+        touch-action: pan-y pinch-zoom;
+      }
+
+      canvas {
+        touch-action: none;
       }
       
       .btn {
@@ -731,6 +817,14 @@
       
       .instructions {
         font-size: 12px;
+      }
+
+      .mobile-only {
+        display: inline;
+      }
+
+      .desktop-only {
+        display: none;
       }
 
       .modal-content {
