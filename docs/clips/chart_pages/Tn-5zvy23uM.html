@@ -121,12 +121,18 @@
                 }
               }
             }
+          }
         });
 
         // リセットボタン
         document.getElementById("resetZoom").addEventListener("click", () => {
           chart.resetZoom();
         });
+      })
+      .catch(error => {
+        console.error('データの読み込みに失敗しました:', error);
+        document.getElementById('chart-container').innerHTML = 
+          '<p style="text-align:center; color:#666;">データの読み込みに失敗しました</p>';
       });
   </script>
 </body>
