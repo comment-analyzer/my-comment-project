@@ -182,77 +182,81 @@
       setTimeout(hideScrollHint, duration);
     }
 
-    // スマートタッチハンドリング
-    function setupSmartTouchHandling() {
+    // デバッグ用ログ関数
+    function debugLog(message, data = '') {
+      console.log(`[Debug] ${message}`, data);
+      // 画面にも表示（デバッグ用）
+      const debugDiv = document.getElementById('debug-info') || (() => {
+        const div = document.createElement('div');
+        div.id = 'debug-info';
+        div.style.cssText = 'position:fixed;top:10px;right:10px;background:rgba(0,0,0,0.8);color:white;padding:10px;border-radius:5px;font-size:12px;z-index:9999;max-width:300px;';
+        document.body.appendChild(div);
+        return div;
+      })();
+      debugDiv.innerHTML = `${message}<br>${JSON.stringify(data)}`;
+    }
+
+    // シンプルなタッチハンドリング（デバッグ用）
+    function setupSimpleTouchHandling() {
       const canvas = document.getElementById('commentChart');
-      const container = document.getElementById('chart-container');
       
-      // タッチ開始
-      function handleTouchStart(e) {
-        touchStartTime = Date.now();
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        isDragging = false;
-        isScrolling = false;
-        hideScrollHint();
-        
-        // クリックタイムアウトをクリア
-        if (clickTimeout) {
-          clearTimeout(clickTimeout);
-          clickTimeout = null;
-        }
-      }
+      let lastX = 0;
+      let startX = 0;
+      let isMoving = false;
       
-      // タッチ移動
-      function handleTouchMove(e) {
-        if (!touchStartTime) return;
-        
+      canvas.addEventListener('touchstart', function(e) {
+        startX = lastX = e.touches[0].clientX;
+        isMoving = false;
+        debugLog('Touch Start', { x: startX });
+        e.preventDefault(); // ページスクロールを防ぐ
+      }, { passive: false });
+      
+      canvas.addEventListener('touchmove', function(e) {
         const currentX = e.touches[0].clientX;
-        const currentY = e.touches[0].clientY;
-        const deltaX = Math.abs(currentX - touchStartX);
-        const deltaY = Math.abs(currentY - touchStartY);
-        const deltaTime = Date.now() - touchStartTime;
+        const deltaX = currentX - lastX;
+        const totalDelta = Math.abs(currentX - startX);
         
-        // スクロール意図の判定
-        if (deltaTime > 100 && (deltaX > 5 || deltaY > 5)) {
-          if (deltaX > deltaY && deltaX > 10) {
-            // 横方向の移動が多い = チャートのパン操作
-            isDragging = true;
-            isScrolling = false;
+        if (totalDelta > 10) {
+          isMoving = true;
+          
+          // Chart.jsのパン操作を手動で実行
+          if (chart && chart.scales.x) {
+            const xScale = chart.scales.x;
+            const currentMin = xScale.min || 0;
+            const currentMax = xScale.max || totalDuration;
+            const range = currentMax - currentMin;
+            const canvasWidth = canvas.width;
+            const pixelRatio = range / canvasWidth;
+            const timeShift = -deltaX * pixelRatio * 2; // 感度調整
+            
+            const newMin = Math.max(0, currentMin + timeShift);
+            const newMax = Math.min(totalDuration, currentMax + timeShift);
+            
+            chart.options.scales.x.min = newMin;
+            chart.options.scales.x.max = newMax;
+            chart.update('none'); // アニメーションなしで更新
+            
+            updateTimeInfo();
             showScrollHint();
-            // Chart.jsにパン操作を委譲するためpreventDefaultしない
-          } else if (deltaY > deltaX && deltaY > 10) {
-            // 縦方向の移動が多い = ページスクロール
-            isScrolling = true;
-            isDragging = false;
-            hideScrollHint();
-            // ページスクロールを許可するためpreventDefaultしない
+            
+            debugLog('Manual Pan', { 
+              deltaX, 
+              timeShift: timeShift.toFixed(1), 
+              newMin: newMin.toFixed(1), 
+              newMax: newMax.toFixed(1) 
+            });
           }
         }
-      }
-      
-      // タッチ終了
-      function handleTouchEnd(e) {
-        if (isDragging) {
-          setTimeout(hideScrollHint, 1000);
-        }
         
-        // 状態リセット
-        setTimeout(() => {
-          touchStartTime = 0;
-          isDragging = false;
-          isScrolling = false;
-        }, 100);
-      }
+        lastX = currentX;
+        e.preventDefault();
+      }, { passive: false });
       
-      // イベント登録
-      canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
-      canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
-      canvas.addEventListener('touchend', handleTouchEnd, { passive: true });
-      
-      container.addEventListener('touchstart', handleTouchStart, { passive: true });
-      container.addEventListener('touchmove', handleTouchMove, { passive: true });
-      container.addEventListener('touchend', handleTouchEnd, { passive: true });
+      canvas.addEventListener('touchend', function(e) {
+        debugLog('Touch End', { wasMoving: isMoving });
+        setTimeout(hideScrollHint, 1000);
+        e.preventDefault();
+      }, { passive: false });
     }
 
     // チャート作成
@@ -356,20 +360,9 @@
             },
             zoom: {
               pan: {
-                enabled: true,
+                enabled: false, // Chart.jsのパン機能を無効化
                 mode: 'x',
-                modifierKey: null,
-                onPanStart: () => {
-                  isDragging = true;
-                  showScrollHint();
-                },
-                onPanComplete: () => {
-                  updateTimeInfo();
-                  setTimeout(() => {
-                    isDragging = false;
-                    hideScrollHint();
-                  }, 500);
-                }
+                modifierKey: null
               },
               zoom: {
                 wheel: {
@@ -380,14 +373,9 @@
                   enabled: true
                 },
                 mode: 'x',
-                onZoomStart: () => {
-                  isDragging = true;
-                },
                 onZoomComplete: () => {
                   updateTimeInfo();
-                  setTimeout(() => {
-                    isDragging = false;
-                  }, 200);
+                  debugLog('Zoom Complete');
                 }
               },
               limits: {
@@ -424,7 +412,7 @@
       updateTimeInfo();
       
       // スマートタッチハンドリングを設定
-      setupSmartTouchHandling();
+      setupSimpleTouchHandling();
       
       // 初期表示時にスクロールヒントを表示
       setTimeout(() => showScrollHintTemporary(), 500);
@@ -518,8 +506,8 @@
       width: 100% !important;
       height: 100% !important;
       cursor: pointer;
-      /* キャンバスでは水平パンを許可 */
-      touch-action: pan-y pinch-zoom;
+      /* キャンバスではタッチ操作を完全に制御 */
+      touch-action: none;
     }
 
     .controls {
