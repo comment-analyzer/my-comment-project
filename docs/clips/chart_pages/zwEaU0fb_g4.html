@@ -36,6 +36,9 @@
     グラフの点をタップ/クリックすると該当時間のYouTube動画に移動
   </div>
 
+  <!-- デバッグ情報 -->
+  <div id="debugInfo" class="debug-info"></div>
+
   <!-- 確認モーダル -->
   <div id="confirmModal" class="modal">
     <div class="modal-content">
@@ -64,6 +67,18 @@
     let isScrolling = false;
     let hasMoved = false;
     let isTooltipEnabled = true;
+
+    // デバッグ情報表示
+    function debugLog(message) {
+      console.log(message);
+      const debugDiv = document.getElementById('debugInfo');
+      debugDiv.innerHTML = `<div>${new Date().toLocaleTimeString()}: ${message}</div>` + debugDiv.innerHTML;
+      // 最新の10件だけ保持
+      const logs = debugDiv.children;
+      if (logs.length > 10) {
+        debugDiv.removeChild(logs[logs.length - 1]);
+      }
+    }
 
     // デバイス判定
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -116,6 +131,7 @@
       modalTime.textContent = `動画の ${formatTime(timeInSeconds)} から再生します`;
       pendingUrl = generateYouTubeUrl(VIDEO_ID, timeInSeconds);
       modal.style.display = 'block';
+      debugLog(`Modal opened for time: ${formatTime(timeInSeconds)}`);
     }
 
     // モーダル非表示
@@ -124,38 +140,28 @@
       pendingUrl = null;
     }
 
-    // 座標からデータポイントを検索
-    function findNearestDataPoint(x, y) {
-      if (!chart || !chartData) return null;
+    // Chart.jsのAPIを使用してクリック位置のデータポイントを取得
+    function getDataPointAtPosition(event) {
+      if (!chart) return null;
       
-      const canvasPosition = Chart.helpers.getRelativePosition({x, y}, chart);
-      const dataX = chart.scales.x.getValueForPixel(canvasPosition.x);
+      const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
+      debugLog(`Elements found: ${elements.length}`);
       
-      // 最も近いデータポイントを検索
-      let nearestIndex = -1;
-      let minDistance = Infinity;
-      
-      for (let i = 0; i < chartData.length; i++) {
-        const distance = Math.abs(chartData[i].time - dataX);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestIndex = i;
-        }
-      }
-      
-      // 距離が妥当な範囲内かチェック（画面幅の10%以内）
-      if (nearestIndex >= 0) {
-        const xScale = chart.scales.x;
-        const range = (xScale.max || totalDuration) - (xScale.min || 0);
-        const threshold = range * 0.1; // 10%の範囲内
+      if (elements.length > 0) {
+        const element = elements[0];
+        const datasetIndex = element.datasetIndex;
+        const index = element.index;
         
-        if (minDistance <= threshold) {
-          return {
-            index: nearestIndex,
-            time: chartData[nearestIndex].time,
-            count: chartData[nearestIndex].count
-          };
-        }
+        const timeValue = chart.data.labels[index];
+        const countValue = chart.data.datasets[datasetIndex].data[index];
+        
+        debugLog(`Found data point - Time: ${formatTime(timeValue)}, Count: ${countValue}`);
+        
+        return {
+          index: index,
+          time: timeValue,
+          count: countValue
+        };
       }
       
       return null;
@@ -264,7 +270,7 @@
       }, { passive: false });
     }
 
-    // タッチハンドリング（スマホ用）- 大幅に改善
+    // タッチハンドリング（スマホ用）- 改善版
     function setupTouchHandling() {
       if (!isTouchDevice) return;
       
@@ -288,6 +294,7 @@
         isDragging = false;
         isScrolling = false;
         
+        debugLog(`Touch start at: ${touch.clientX}, ${touch.clientY}`);
         e.preventDefault();
       }, { passive: false });
       
@@ -339,33 +346,34 @@
         
         setTimeout(hideScrollHint, 500);
         
-        // タップ判定：短時間 && 小さな移動 && 横方向の動きが少ない
+        // タップ判定：短時間 && 小さな移動
         const isTap = touchDuration < 400 && 
                      totalMovementX < 20 && 
                      totalMovementY < 20 && 
                      !hasMoved;
         
-        console.log('Touch end:', {
-          duration: touchDuration,
-          totalMovementX,
-          totalMovementY,
-          hasMoved,
-          isTap
-        });
+        debugLog(`Touch end - Duration: ${touchDuration}ms, MovementX: ${totalMovementX}, MovementY: ${totalMovementY}, IsTap: ${isTap}`);
         
         if (isTap) {
+          // Chart.jsのAPIを使用してタップ位置のデータポイントを取得
           const rect = canvas.getBoundingClientRect();
           const x = touch.clientX - rect.left;
           const y = touch.clientY - rect.top;
           
-          console.log('Tap detected at:', x, y);
+          debugLog(`Tap detected at canvas position: ${x}, ${y}`);
           
-          const nearestPoint = findNearestDataPoint(x, y);
-          if (nearestPoint) {
-            console.log('Found nearest point:', nearestPoint);
-            showConfirmModal(nearestPoint.time);
+          // 疑似イベントオブジェクトを作成
+          const fakeEvent = {
+            x: touch.clientX,
+            y: touch.clientY,
+            native: true
+          };
+          
+          const dataPoint = getDataPointAtPosition(fakeEvent);
+          if (dataPoint) {
+            showConfirmModal(dataPoint.time);
           } else {
-            console.log('No nearby point found');
+            debugLog('No data point found at tap position');
           }
         }
         
@@ -387,6 +395,8 @@
       const counts = data.map(d => d.count);
       totalDuration = Math.max(...labels);
       maxCommentCount = Math.max(...counts);
+
+      debugLog(`Chart data loaded: ${data.length} points, duration: ${formatTime(totalDuration)}`);
 
       const ctx = document.getElementById("commentChart").getContext("2d");
 
@@ -417,15 +427,18 @@
             mode: 'nearest'
           },
           onClick: (event, elements) => {
-            if (isTouchDevice) return;
+            debugLog(`Chart clicked - Elements: ${elements.length}, isDragging: ${isDragging}, isScrolling: ${isScrolling}`);
             
             if (isDragging || isScrolling) {
+              debugLog('Click ignored due to dragging/scrolling');
               return;
             }
             
-            if (elements.length > 0) {
+            // PC用のクリック処理
+            if (!isTouchDevice && elements.length > 0) {
               const elementIndex = elements[0].index;
               const timeInSeconds = labels[elementIndex];
+              debugLog(`PC click: Opening modal for time ${formatTime(timeInSeconds)}`);
               showConfirmModal(timeInSeconds);
             }
           },
@@ -536,12 +549,32 @@
       }
     }
 
-    // データ読み込み
+    // データ読み込み（テスト用のサンプルデータも含む）
+    // 実際のデータファイルが見つからない場合はサンプルデータを使用
     fetch("../chart_data/" + VIDEO_ID + "_chart.json")
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Data file not found');
+        return res.json();
+      })
       .then(data => {
         createChart(data);
+      })
+      .catch(error => {
+        console.warn('Failed to load data file, using sample data:', error);
+        debugLog('Using sample data for testing');
         
+        // サンプルデータを生成
+        const sampleData = [];
+        for (let i = 0; i <= 3600; i += 10) {
+          sampleData.push({
+            time: i,
+            count: Math.floor(Math.random() * 50) + 5
+          });
+        }
+        
+        createChart(sampleData);
+      })
+      .finally(() => {
         // ボタンイベント
         document.getElementById("zoomIn").addEventListener("click", zoomIn);
         document.getElementById("zoomOut").addEventListener("click", zoomOut);
@@ -551,6 +584,7 @@
         // モーダルイベント
         document.getElementById("confirmYes").addEventListener("click", () => {
           if (pendingUrl) {
+            debugLog(`Opening YouTube URL: ${pendingUrl}`);
             window.open(pendingUrl, '_blank');
           }
           hideConfirmModal();
@@ -575,12 +609,6 @@
             hideConfirmModal();
           }
         });
-      })
-      .catch(error => {
-        console.error('データの読み込みに失敗しました:', error);
-        document.getElementById('chart-container').innerHTML = 
-          '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#666;text-align:center;">' +
-          '<div><p style="font-size:2rem;margin:0;">📊</p><p>データの読み込みに失敗しました</p><p style="font-size:0.9rem;color:#999;">ネットワーク接続を確認してください</p></div></div>';
       });
   </script>
   
@@ -698,6 +726,24 @@
       color: #333;
       text-align: center;
       margin-top: 10px;
+    }
+
+    .debug-info {
+      background: rgba(255, 255, 0, 0.1);
+      border: 1px solid rgba(255, 255, 0, 0.3);
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+      font-family: monospace;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .debug-info div {
+      margin: 2px 0;
+      padding: 2px;
+      border-bottom: 1px solid rgba(0,0,0,0.1);
     }
 
     .instructions {
