@@ -206,6 +206,28 @@
       background: #ddd;
     }
 
+    /* スクロールヒントオーバーレイ */
+    .scroll-hint {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .scroll-hint.show {
+      opacity: 1;
+    }
+
     /* スマホ向け調整 */
     @media (max-width: 768px) {
       body {
@@ -236,6 +258,12 @@
         width: 95%;
         padding: 16px;
       }
+
+      .scroll-hint {
+        bottom: 12px;
+        font-size: 11px;
+        padding: 6px 12px;
+      }
     }
 
     @media (max-width: 480px) {
@@ -251,6 +279,7 @@
   
   <div id="chart-container">
     <canvas id="commentChart"></canvas>
+    <div id="scrollHint" class="scroll-hint">← スクロールで移動 →</div>
   </div>
   
   <div id="timeInfo" class="time-info"></div>
@@ -288,6 +317,13 @@
     let pendingUrl = null;
     let chartData = [];
     let totalDuration = 0;
+    
+    // タッチ操作の判定用変数
+    let touchStartTime = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isDragging = false;
+    let clickTimeout = null;
 
     // 時間フォーマット関数
     function formatTime(seconds) {
@@ -392,6 +428,68 @@
       updateTimeInfo();
     }
 
+    // スクロールヒントの表示制御
+    function showScrollHint() {
+      const hint = document.getElementById('scrollHint');
+      hint.classList.add('show');
+    }
+
+    function hideScrollHint() {
+      const hint = document.getElementById('scrollHint');
+      hint.classList.remove('show');
+    }
+
+    // 初期表示時とドラッグ時にヒントを表示
+    function showScrollHintTemporary(duration = 3000) {
+      showScrollHint();
+      setTimeout(hideScrollHint, duration);
+    }
+
+    // タッチ操作の意図を判別する関数
+    function handleTouchStart(e) {
+      touchStartTime = Date.now();
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isDragging = false;
+      
+      // タッチ開始時はヒントを非表示
+      hideScrollHint();
+    }
+
+    function handleTouchMove(e) {
+      if (!touchStartTime) return;
+      
+      const currentTime = Date.now();
+      const deltaTime = currentTime - touchStartTime;
+      const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+      const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+      const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      // 200ms経過またはタッチ移動が10px以上でドラッグと判定
+      if (deltaTime > 200 || totalDelta > 10) {
+        isDragging = true;
+        showScrollHint(); // ドラッグ中はヒント表示
+        
+        // 予約されたクリックイベントをキャンセル
+        if (clickTimeout) {
+          clearTimeout(clickTimeout);
+          clickTimeout = null;
+        }
+      }
+    }
+
+    function handleTouchEnd(e) {
+      setTimeout(() => {
+        if (isDragging) {
+          hideScrollHint(); // ドラッグ終了時はヒント非表示
+        }
+      }, 500);
+      
+      // 状態をリセット
+      touchStartTime = 0;
+      isDragging = false;
+    }
+
     // スマホでのタッチイベント処理を強化
     function setupTouchHandling() {
       const canvas = document.getElementById('commentChart');
@@ -399,6 +497,7 @@
       
       // キャンバスでのタッチイベントを適切に処理
       canvas.addEventListener('touchstart', function(e) {
+        handleTouchStart(e);
         // チャート操作時はページスクロールを防ぐ
         if (e.touches.length <= 2) { // パンやピンチの場合のみ
           e.preventDefault();
@@ -406,11 +505,16 @@
       }, { passive: false });
       
       canvas.addEventListener('touchmove', function(e) {
+        handleTouchMove(e);
         // チャート操作時はページスクロールを防ぐ
         if (e.touches.length <= 2) {
           e.preventDefault();
         }
       }, { passive: false });
+      
+      canvas.addEventListener('touchend', function(e) {
+        handleTouchEnd(e);
+      }, { passive: true });
       
       // コンテナでも同様の処理
       container.addEventListener('touchstart', function(e) {
@@ -469,7 +573,26 @@
             if (elements.length > 0) {
               const elementIndex = elements[0].index;
               const timeInSeconds = labels[elementIndex];
-              showConfirmModal(timeInSeconds);
+              
+              // ドラッグ中の場合はクリックを無視
+              if (isDragging) {
+                return;
+              }
+              
+              // タッチデバイスの場合は少し遅延してクリック処理
+              const isTouchDevice = 'ontouchstart' in window;
+              if (isTouchDevice && touchStartTime > 0) {
+                // 200ms待って、その間にドラッグが検出されなければクリック実行
+                clickTimeout = setTimeout(() => {
+                  if (!isDragging) {
+                    showConfirmModal(timeInSeconds);
+                  }
+                  clickTimeout = null;
+                }, 200);
+              } else {
+                // PC環境では即座にクリック処理
+                showConfirmModal(timeInSeconds);
+              }
             }
           },
           scales: {
@@ -570,6 +693,9 @@
       
       // スマホ向けタッチハンドリングを設定
       setupTouchHandling();
+      
+      // 初期表示時にスクロールヒントを3秒間表示
+      setTimeout(() => showScrollHintTemporary(), 500);
     }
 
     // データ読み込み
