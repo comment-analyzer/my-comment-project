@@ -51,13 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } else {
       // プレイヤーが存在しない場合：新規作成
-      youtubePlayer = new YT.Player('youtube-player-iframe', { // IDで直接指定
+      youtubePlayer = new YT.Player('youtube-player-mount', { // 新しいマウントポイントのID
         height: '100%',
         width: '100%',
         videoId: videoId,
         playerVars: {
           'playsinline': 1,
-          'autoplay': 1,
           'start': startTime,
           'rel': 0,
           'modestbranding': 1
