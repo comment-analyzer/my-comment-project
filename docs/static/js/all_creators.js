@@ -48,12 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filteredCreators.forEach((creator, index) => {
+      console.log(`Creator: ${creator.name}, creator_page: ${creator.creator_page}`); // DEBUG LOG
       const item = document.createElement('div');
       item.classList.add('carousel-item');
       item.dataset.index = index;
+      
+      // Always create the <a> tag, even if creator.creator_page is empty
+      const detailLink = creator.creator_page ? `../creators/${creator.creator_page}` : '#';
+
       item.innerHTML = `
-        <img src="${creator.icon_url || 'https://via.placeholder.com/150'}" alt="${creator.name}">
-        <h3>${creator.name}</h3>
+        <a href="${detailLink}">
+          <img src="${creator.icon_url || 'https://via.placeholder.com/150'}" alt="${creator.name}">
+          <h3>${creator.name}</h3>
+        </a>
       `;
       carousel.appendChild(item);
     });
