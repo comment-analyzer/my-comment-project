@@ -85,10 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (filteredCreators.length === 0) {
       infoCreatorName.textContent = '';
       infoCreatorGroup.textContent = '';
-      infoTotalVideos.textContent = '';
-      infoTotalComments.textContent = '';
+      infoAvgCommentsPerHour.textContent = '';
+      infoMaxCommentsPerHour.textContent = '';
+      infoMaxCommentsPer10s.textContent = '';
       infoLinks.innerHTML = '';
-      infoDetailLink.style.display = 'none';
       return;
     }
 
