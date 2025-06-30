@@ -13,7 +13,6 @@
   opacity: 0;
   transition: opacity 0.3s ease-in-out;
   /* flexboxプロパティを再度追加 */
-  display: flex; /* showクラスでflexに切り替えるため、初期はnone */
   justify-content: center;
   align-items: flex-start; /* 上部に配置 */
 }
