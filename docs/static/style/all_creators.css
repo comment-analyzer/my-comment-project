@@ -26,17 +26,21 @@ h1 {
 .filter-buttons {
   text-align: center;
   margin-bottom: 30px;
+  display: flex; /* Flexboxを適用 */
+  justify-content: center; /* 中央寄せ */
+  flex-wrap: wrap; /* 折り返しを許可 */
+  gap: 10px; /* ボタン間の隙間 */
 }
 
 .filter-btn {
   background-color: #e0e0e0;
   border: none;
   padding: 10px 20px;
-  margin: 0 5px;
   border-radius: 20px;
   cursor: pointer;
   font-size: 16px;
   transition: background-color 0.3s ease;
+  white-space: nowrap; /* ボタン内のテキストの折り返しを防ぐ */
 }
 
 .filter-btn.active {
@@ -46,6 +50,14 @@ h1 {
 
 .filter-btn:hover:not(.active) {
   background-color: #d0d0d0;
+}
+
+/* スマホ向け調整 */
+@media (max-width: 600px) {
+  .filter-btn {
+    font-size: 14px; /* フォントサイズを小さく */
+    padding: 8px 15px; /* パディングを調整 */
+  }
 }
 
 .carousel-container {
@@ -62,7 +74,7 @@ h1 {
   -webkit-overflow-scrolling: touch;
   padding: 20px 0;
   gap: 20px;
-  justify-content: center; /* アイテムが少ない時に中央寄せ */
+  /* justify-content: center; */ /* アイテムが少ない時に中央寄せ - scroll-snap-alignと競合する可能性があるのでコメントアウト */
 }
 
 .carousel-item {
@@ -72,6 +84,12 @@ h1 {
   transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
   cursor: pointer;
   position: relative;
+}
+
+.carousel-item a {
+  text-decoration: none;
+  color: inherit;
+  display: block; /* リンク全体をクリック可能に */
 }
 
 .carousel-item img {
