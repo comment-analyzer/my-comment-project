@@ -203,7 +203,7 @@
         cancelAnimationFrame(inertiaAnimationId);
       }
       
-      velocityX = calculateVelocity();
+      velocityX = -calculateVelocity();
       
       if (Math.abs(velocityX) > 0.5) { // 閾値を調整
         isInertiaActive = true;
