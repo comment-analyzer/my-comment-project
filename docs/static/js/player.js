@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function hidePlayer() {
     playerOverlay.classList.remove('show');
     document.body.classList.remove('no-scroll');
+    document.documentElement.classList.remove('no-scroll');
 
     // 動画の再生を停止
     if (youtubePlayer && typeof youtubePlayer.stopVideo === 'function') {
