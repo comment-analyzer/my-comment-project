@@ -116,12 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // 他のSNSリンクも同様に追加
 
-    if (currentCreator.creator_page) {
-      infoDetailLink.href = `../creators/${currentCreator.creator_page}`;
-      infoDetailLink.style.display = 'inline-block';
-    } else {
-      infoDetailLink.style.display = 'none';
-    }
+    
   }
 
   // イベントリスナーの設定
