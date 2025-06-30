@@ -71,6 +71,7 @@ h1 {
   display: flex;
   overflow-x: scroll; /* スワイプ可能にする */
   scroll-snap-type: x mandatory;
+  scroll-snap-stop: always; /* スクロールが常にスナップポイントで停止するようにする */
   -webkit-overflow-scrolling: touch;
   padding: 20px 0;
   gap: 20px;
