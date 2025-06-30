@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hideConfirmModal(); // 既存の確認モーダルは非表示に
 
-    playerOverlay.style.display = 'flex';
+    
     document.body.classList.add('no-scroll');
     setTimeout(() => playerOverlay.classList.add('show'), 10);
 
