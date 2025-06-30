@@ -1,193 +1,184 @@
-/* all_creators.css */
+console.log('all_creators.js loaded');
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f0f2f5;
-  margin: 0;
-  padding: 20px;
-  color: #333;
-}
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded fired');
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  const carousel = document.querySelector('.carousel');
+  const prevBtn = document.querySelector('.carousel-nav.prev');
+  const nextBtn = document.querySelector('.carousel-nav.next');
+  const infoCreatorName = document.getElementById('info-creator-name');
+  const infoCreatorGroup = document.getElementById('info-creator-group');
+  const infoAvgCommentsPerHour = document.getElementById('info-avg-comments-per-hour');
+  const infoMaxCommentsPerHour = document.getElementById('info-max-comments-per-hour');
+  const infoMaxCommentsPer10s = document.getElementById('info-max-comments-per-10s');
+  const infoLinks = document.querySelector('.info-links');
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  background-color: #fff;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
+  let allCreators = [];
+  let filteredCreators = [];
+  let currentIndex = 0;
 
-h1 {
-  text-align: center;
-  color: #2c3e50;
-  margin-bottom: 30px;
-}
-
-.filter-buttons {
-  text-align: center;
-  margin-bottom: 30px;
-  display: flex; /* Flexboxを適用 */
-  justify-content: center; /* 中央寄せ */
-  flex-wrap: wrap; /* 折り返しを許可 */
-  gap: 10px; /* ボタン間の隙間 */
-}
-
-.filter-btn {
-  background-color: #e0e0e0;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.3s ease;
-  white-space: nowrap; /* ボタン内のテキストの折り返しを防ぐ */
-}
-
-.filter-btn.active {
-  background-color: #42A5F5;
-  color: white;
-}
-
-.filter-btn:hover:not(.active) {
-  background-color: #d0d0d0;
-}
-
-/* スマホ向け調整 */
-@media (max-width: 600px) {
-  .filter-btn {
-    font-size: 14px; /* フォントサイズを小さく */
-    padding: 8px 15px; /* パディングを調整 */
+  // データの読み込み
+  async function fetchCreators() {
+    console.log('fetchCreators started');
+    try {
+      const response = await fetch('../data/creators.json');
+      allCreators = await response.json();
+      console.log('fetchCreators successful, allCreators:', allCreators);
+      filterCreators('all'); // 初期表示は全て
+    } catch (error) {
+      console.error('Error fetching creators data:', error);
+    }
   }
-}
 
-.carousel-container {
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-  margin-bottom: 30px;
-}
+  // 配信者のフィルタリング
+  function filterCreators(group) {
+    console.log('filterCreators called with group:', group);
+    if (group === 'all') {
+      filteredCreators = [...allCreators];
+    } else {
+      filteredCreators = allCreators.filter(creator => creator.group === group);
+    }
+    currentIndex = 0; // フィルタリングしたら先頭に戻る
+    renderCarousel();
+    updateCreatorInfo();
+  }
 
-.carousel {
-  display: flex;
-  overflow-x: scroll; /* スワイプ可能にする */
-  scroll-snap-type: x mandatory;
-  scroll-snap-stop: always; /* スクロールが常にスナップポイントで停止するようにする */
-  -webkit-overflow-scrolling: touch;
-  padding: 20px 0;
-  gap: 20px;
-  /* justify-content: center; */ /* アイテムが少ない時に中央寄せ - scroll-snap-alignと競合する可能性があるのでコメントアウト */
-  
-  /* カルーセルアイテムのセンタリング調整 */
-  padding-left: calc(50% - 75px); /* 画面幅の半分 - アイテム幅の半分 (150px / 2) */
-  padding-right: calc(50% - 75px); /* 同上 */
-  scroll-padding-left: calc(50% - 75px); /* スナップ位置の調整 */
-  scroll-padding-right: calc(50% - 75px); /* スナップ位置の調整 */
-}
+  // カルーセルのレンダリング
+  function renderCarousel() {
+    console.log('renderCarousel started');
+    carousel.innerHTML = '';
+    if (filteredCreators.length === 0) {
+      carousel.innerHTML = '<p>該当する配信者はいません。</p>';
+      return;
+    }
 
-.carousel-item {
-  flex: 0 0 auto;
-  scroll-snap-align: center;
-  text-align: center;
-  transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
-  cursor: pointer;
-  position: relative;
-}
+    filteredCreators.forEach((creator, index) => {
+      console.log(`Creator: ${creator.name}, creator_page: ${creator.creator_page}`); // DEBUG LOG
+      const item = document.createElement('div');
+      item.classList.add('carousel-item');
+      item.dataset.index = index;
+      
+      // Always create the <a> tag, even if creator.creator_page is empty
+      const detailLink = creator.creator_page ? `../creators/${creator.creator_page}` : '#';
 
-.carousel-item a {
-  text-decoration: none;
-  color: inherit;
-  display: block; /* リンク全体をクリック可能に */
-}
+      item.innerHTML = `
+        <a href="${detailLink}">
+          <img src="${creator.icon_url || 'https://via.placeholder.com/150'}" alt="${creator.name}">
+        </a>
+      `;
+      carousel.appendChild(item);
+    });
+    updateCarouselActiveState();
+  }
 
-.carousel-item img {
-  width: 150px; /* 立ち絵の基本サイズ */
-  height: 150px;
-  object-fit: cover;
-  border-radius: 50%; /* 円形にクリップ */
-  border: 3px solid transparent;
-  transition: border-color 0.3s ease;
-}
+  // カルーセルの中央アイテムのアクティブ状態を更新
+  function updateCarouselActiveState() {
+    const items = document.querySelectorAll('.carousel-item');
+    items.forEach((item, index) => {
+      if (index === currentIndex) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+    // 中央にスクロール
+    const activeItem = items[currentIndex];
+    if (activeItem) {
+      carousel.scrollTo({
+        left: activeItem.offsetLeft - (carousel.offsetWidth / 2) + (activeItem.offsetWidth / 2),
+        behavior: 'smooth'
+      });
+    }
+  }
 
-.carousel-item.active img {
-  transform: scale(1.1); /* 中央のアイテムを拡大 */
-  border-color: #42A5F5;
-}
+  // 配信者情報の更新
+  function updateCreatorInfo() {
+    console.log('updateCreatorInfo started');
+    if (filteredCreators.length === 0) {
+      infoCreatorName.textContent = '';
+      infoCreatorGroup.textContent = '';
+      infoAvgCommentsPerHour.textContent = '';
+      infoMaxCommentsPerHour.textContent = '';
+      infoMaxCommentsPer10s.textContent = '';
+      infoLinks.innerHTML = '';
+      return;
+    }
 
-.carousel-item:not(.active) {
-  transform: scale(0.8); /* 中央以外のアイテムを縮小 */
-  opacity: 0.6; /* 中央以外のアイテムを暗く */
-  filter: brightness(70%);
-}
+    const currentCreator = filteredCreators[currentIndex];
+    infoCreatorName.textContent = currentCreator.name;
+    infoCreatorGroup.textContent = `所属: ${currentCreator.group || '不明'}`;
+    infoAvgCommentsPerHour.textContent = `平均コメント数/1h: ${currentCreator.average_comments_per_hour || 'N/A'}`;
+    infoMaxCommentsPerHour.textContent = `最大コメント数/1h: ${currentCreator.max_comments_per_hour || 'N/A'}`;
+    infoMaxCommentsPer10s.textContent = `最大コメント数/10s: ${currentCreator.max_comments_per_10s || 'N/A'}`;
 
-.carousel-item h3 {
-  margin-top: 10px;
-  font-size: 1.1em;
-  color: #555;
-}
+    infoLinks.innerHTML = '';
+    if (currentCreator.youtube_channel_url) {
+      const youtubeLink = document.createElement('a');
+      youtubeLink.href = currentCreator.youtube_channel_url;
+      youtubeLink.target = '_blank';
+      youtubeLink.textContent = 'YouTube';
+      infoLinks.appendChild(youtubeLink);
+    }
+    if (currentCreator.twitter_url) {
+      const twitterLink = document.createElement('a');
+      twitterLink.href = currentCreator.twitter_url;
+      twitterLink.target = '_blank';
+      twitterLink.textContent = 'Twitter';
+      infoLinks.appendChild(twitterLink);
+    }
+    // 他のSNSリンクも同様に追加
+  }
 
-.carousel-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: rgba(0, 0, 0, 0.5);
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 10;
-  font-size: 1.5em;
-}
+  // イベントリスナーの設定
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      filterButtons.forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+      filterCreators(button.dataset.group);
+    });
+  });
 
-.carousel-nav.prev {
-  left: 10px;
-}
+  prevBtn.addEventListener('click', () => {
+    currentIndex = (currentIndex - 1 + filteredCreators.length) % filteredCreators.length;
+    updateCarouselActiveState();
+    updateCreatorInfo();
+  });
 
-.carousel-nav.next {
-  right: 10px;
-}
+  nextBtn.addEventListener('click', () => {
+    currentIndex = (currentIndex + 1) % filteredCreators.length;
+    updateCarouselActiveState();
+    updateCreatorInfo();
+  });
 
-.creator-info-display {
-  text-align: center;
-  padding: 20px;
-  border-top: 1px solid #eee;
-  margin-top: 30px;
-}
+  carousel.addEventListener('scroll', () => {
+    // スクロールが停止したときに中央のアイテムを特定
+    clearTimeout(carousel.scrollTimeout);
+    carousel.scrollTimeout = setTimeout(() => {
+      const scrollLeft = carousel.scrollLeft;
+      const carouselWidth = carousel.offsetWidth;
+      const items = document.querySelectorAll('.carousel-item');
+      let closestIndex = 0;
+      let minDistance = Infinity;
 
-.creator-info-display h2 {
-  color: #2c3e50;
-  margin-bottom: 10px;
-}
+      items.forEach((item, index) => {
+        const itemCenter = item.offsetLeft + item.offsetWidth / 2;
+        const carouselCenter = scrollLeft + carouselWidth / 2;
+        const distance = Math.abs(itemCenter - carouselCenter);
 
-.creator-info-display p {
-  margin-bottom: 5px;
-  color: #666;
-}
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = index;
+        }
+      });
 
-.info-links a {
-  display: inline-block;
-  margin: 0 10px;
-  color: #42A5F5;
-  text-decoration: none;
-  font-weight: bold;
-}
+      if (closestIndex !== currentIndex) {
+        currentIndex = closestIndex;
+        updateCarouselActiveState();
+        updateCreatorInfo();
+      }
+    }, 50); // スクロール停止後50msで判定
+  });
 
-.info-links a:hover {
-  text-decoration: underline;
-}
-
-.btn {
-  background-color: #4CAF50;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  text-decoration: none;
-  margin-top: 20px;
-  display: inline-block;
-  transition: background-color 0.3s ease;
-}
-
-.btn:hover {
-  background-color: #45a049;
-}
+  // 初期データの読み込み
+  fetchCreators();
+});
