@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全配信者一覧 - コメント分析</title>
+  <link rel="stylesheet" href="../static/style/all_creators.css">
+</head>
+<body>
+  <div class="container">
+    <h1>全配信者一覧</h1>
+
+    <div class="filter-buttons">
+      <button class="filter-btn active" data-group="all">全て</button>
+      <button class="filter-btn" data-group="nijisanji">にじさんじ</button>
+      <button class="filter-btn" data-group="hololive">ホロライブ</button>
+      <!-- 必要に応じて他のグループも追加 -->
+    </div>
+
+    <div class="carousel-container">
+      <div class="carousel">
+        <!-- 立ち絵アイテムがここに動的に挿入される -->
+      </div>
+      <button class="carousel-nav prev">&lt;</button>
+      <button class="carousel-nav next">&gt;</button>
+    </div>
+
+    <div class="creator-info-display">
+      <h2 id="info-creator-name"></h2>
+      <p id="info-creator-group"></p>
+      <p id="info-total-videos"></p>
+      <p id="info-total-comments"></p>
+      <div class="info-links">
+        <!-- YouTube, SNSリンクなどがここに動的に挿入される -->
+      </div>
+      <a id="info-detail-link" href="#" class="btn">詳細ページへ</a>
+    </div>
+  </div>
+
+  <script src="../static/js/all_creators.js"></script>
+</body>
+</html>
