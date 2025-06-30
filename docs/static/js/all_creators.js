@@ -1,4 +1,7 @@
+console.log('all_creators.js loaded');
+
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOMContentLoaded fired');
   const filterButtons = document.querySelectorAll('.filter-btn');
   const carousel = document.querySelector('.carousel');
   const prevBtn = document.querySelector('.carousel-nav.prev');
@@ -9,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const infoMaxCommentsPerHour = document.getElementById('info-max-comments-per-hour');
   const infoMaxCommentsPer10s = document.getElementById('info-max-comments-per-10s');
   const infoLinks = document.querySelector('.info-links');
-  const infoDetailLink = document.getElementById('info-detail-link');
 
   let allCreators = [];
   let filteredCreators = [];
@@ -17,18 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // データの読み込み
   async function fetchCreators() {
+    console.log('fetchCreators started');
     try {
       const response = await fetch('../data/creators.json');
       allCreators = await response.json();
+      console.log('fetchCreators successful, allCreators:', allCreators);
       filterCreators('all'); // 初期表示は全て
     } catch (error) {
       console.error('Error fetching creators data:', error);
-      carousel.innerHTML = '<p>配信者データを読み込めませんでした。</p>';
     }
   }
 
   // 配信者のフィルタリング
   function filterCreators(group) {
+    console.log('filterCreators called with group:', group);
     if (group === 'all') {
       filteredCreators = [...allCreators];
     } else {
@@ -41,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // カルーセルのレンダリング
   function renderCarousel() {
+    console.log('renderCarousel started');
     carousel.innerHTML = '';
     if (filteredCreators.length === 0) {
       carousel.innerHTML = '<p>該当する配信者はいません。</p>';
@@ -89,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 配信者情報の更新
   function updateCreatorInfo() {
+    console.log('updateCreatorInfo started');
     if (filteredCreators.length === 0) {
       infoCreatorName.textContent = '';
       infoCreatorGroup.textContent = '';
@@ -122,8 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
       infoLinks.appendChild(twitterLink);
     }
     // 他のSNSリンクも同様に追加
-
-    
   }
 
   // イベントリスナーの設定
@@ -173,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCarouselActiveState();
         updateCreatorInfo();
       }
-    }, 150); // スクロール停止後150msで判定
+    }, 50); // スクロール停止後50msで判定
   });
 
   // 初期データの読み込み
