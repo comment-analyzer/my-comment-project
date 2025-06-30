@@ -5,8 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextBtn = document.querySelector('.carousel-nav.next');
   const infoCreatorName = document.getElementById('info-creator-name');
   const infoCreatorGroup = document.getElementById('info-creator-group');
-  const infoTotalVideos = document.getElementById('info-total-videos');
-  const infoTotalComments = document.getElementById('info-total-comments');
+  const infoAvgCommentsPerHour = document.getElementById('info-avg-comments-per-hour');
+  const infoMaxCommentsPerHour = document.getElementById('info-max-comments-per-hour');
+  const infoMaxCommentsPer10s = document.getElementById('info-max-comments-per-10s');
   const infoLinks = document.querySelector('.info-links');
   const infoDetailLink = document.getElementById('info-detail-link');
 
