@@ -30,15 +30,17 @@
   overflow: hidden;
 }
 
-/* Iframe Container: YouTubeプレイヤーのアスペクト比を維持 */
-#youtube-player-iframe {
+/* Iframe Wrapper: YouTubeプレイヤーのアスペクト比を維持 */
+.player-wrapper {
   position: relative;
   width: 100%;
   padding-top: 56.25%; /* 16:9のアスペクト比 */
   height: 0;
+  background-color: #000;
 }
 
-#youtube-player-iframe iframe {
+#youtube-player-mount,
+#youtube-player-mount iframe {
   position: absolute;
   top: 0;
   left: 0;
