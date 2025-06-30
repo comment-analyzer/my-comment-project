@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'modestbranding': 1
         },
         events: {
-          'onReady': (event) => event.target.playVideo()
+          'onReady': (event) => {}
         }
       });
     }
