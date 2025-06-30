@@ -75,6 +75,12 @@ h1 {
   padding: 20px 0;
   gap: 20px;
   /* justify-content: center; */ /* アイテムが少ない時に中央寄せ - scroll-snap-alignと競合する可能性があるのでコメントアウト */
+  
+  /* カルーセルアイテムのセンタリング調整 */
+  padding-left: calc(50% - 75px); /* 画面幅の半分 - アイテム幅の半分 (150px / 2) */
+  padding-right: calc(50% - 75px); /* 同上 */
+  scroll-padding-left: calc(50% - 75px); /* スナップ位置の調整 */
+  scroll-padding-right: calc(50% - 75px); /* スナップ位置の調整 */
 }
 
 .carousel-item {
