@@ -94,8 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentCreator = filteredCreators[currentIndex];
     infoCreatorName.textContent = currentCreator.name;
     infoCreatorGroup.textContent = `所属: ${currentCreator.group || '不明'}`;
-    infoTotalVideos.textContent = `総動画数: ${currentCreator.total_videos || 'N/A'}`;
-    infoTotalComments.textContent = `総コメント数: ${currentCreator.total_comments || 'N/A'}`;
+    infoAvgCommentsPerHour.textContent = `平均コメント数/1h: ${currentCreator.average_comments_per_hour || 'N/A'}`;
+    infoMaxCommentsPerHour.textContent = `最大コメント数/1h: ${currentCreator.max_comments_per_hour || 'N/A'}`;
+    infoMaxCommentsPer10s.textContent = `最大コメント数/10s: ${currentCreator.max_comments_per_10s || 'N/A'}`;
 
     infoLinks.innerHTML = '';
     if (currentCreator.youtube_channel_url) {
