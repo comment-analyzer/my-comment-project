@@ -64,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
       item.innerHTML = `
         <a href="${detailLink}">
           <img src="${creator.icon_url || 'https://via.placeholder.com/150'}" alt="${creator.name}">
-          <h3>${creator.name}</h3>
         </a>
       `;
       carousel.appendChild(item);
