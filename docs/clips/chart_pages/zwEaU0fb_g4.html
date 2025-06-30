@@ -73,9 +73,10 @@
     let lastTouchX = 0;
     let inertiaAnimationId = null;
     let velocityHistory = [];
-    const velocityHistoryLength = 5;
-    const frictionDeceleration = 0.95; // 摩擦による減速係数
-    const minVelocity = 0.5; // 最小速度（これ以下で停止）
+    const velocityHistoryLength = 8; // 履歴を長くして精度向上
+    const frictionDeceleration = 0.98; // 摩擦を小さくして慣性を強化
+    const minVelocity = 0.3; // 最小速度を下げて長く続くように
+    const inertiaMultiplier = 3.0; // 慣性の強さを大幅に増加
 
     // ダブルタップ/ダブルクリック検出用
     let lastTapTime = 0;
@@ -117,14 +118,14 @@
       const currentMax = xScale.max || totalDuration;
       const range = currentMax - currentMin;
       
-      // 速度を時間軸の移動量に変換
-      const timeShift = velocityX * range * 0.001; // 感度調整
+      // 速度を時間軸の移動量に変換（符号を修正し、強度を増加）
+      const timeShift = velocityX * range * 0.003 * inertiaMultiplier; // 強度を大幅に増加
       
       const newMin = Math.max(0, currentMin + timeShift);
       const newMax = Math.min(totalDuration, currentMax + timeShift);
       
       // 境界に達した場合は停止
-      if ((newMin <= 0 && velocityX < 0) || (newMax >= totalDuration && velocityX > 0)) {
+      if ((newMin <= 0 && timeShift < 0) || (newMax >= totalDuration && timeShift > 0)) {
         inertiaAnimationId = null;
         enableTooltipWithDelay(300);
         return;
@@ -141,24 +142,26 @@
       inertiaAnimationId = requestAnimationFrame(animateInertiaScroll);
     }
 
-    // 速度の計算
+    // 速度の計算（改善版）
     function calculateVelocity() {
-      if (velocityHistory.length < 2) return 0;
+      if (velocityHistory.length < 3) return 0;
       
-      // 最近の複数のポイントから平均速度を計算
+      // 最近の複数のポイントから重み付き平均速度を計算
       let totalVelocity = 0;
-      let validSamples = 0;
+      let totalWeight = 0;
       
       for (let i = 1; i < velocityHistory.length; i++) {
         const timeDiff = velocityHistory[i].time - velocityHistory[i-1].time;
-        if (timeDiff > 0 && timeDiff < 50) { // 50ms以内の有効なサンプルのみ
+        if (timeDiff > 0 && timeDiff < 100) { // 100ms以内の有効なサンプル
           const velocity = (velocityHistory[i].x - velocityHistory[i-1].x) / timeDiff;
-          totalVelocity += velocity;
-          validSamples++;
+          // 新しいサンプルにより大きな重みを付ける
+          const weight = i / velocityHistory.length;
+          totalVelocity += velocity * weight;
+          totalWeight += weight;
         }
       }
       
-      return validSamples > 0 ? totalVelocity / validSamples : 0;
+      return totalWeight > 0 ? totalVelocity / totalWeight : 0;
     }
 
     // 慣性スクロールの開始
@@ -167,10 +170,11 @@
         cancelAnimationFrame(inertiaAnimationId);
       }
       
-      velocityX = calculateVelocity();
+      // 速度計算の符号を修正（右スワイプで時間が進む方向に）
+      velocityX = -calculateVelocity(); // 符号を反転
       
-      // 最小速度の閾値を設定
-      if (Math.abs(velocityX) > 2) { // 最小速度の閾値
+      // 最小速度の閾値を下げる
+      if (Math.abs(velocityX) > 1) { // 閾値を下げて小さな動きでも慣性が働くように
         disableTooltip();
         animateInertiaScroll();
       }
@@ -418,7 +422,7 @@
         totalMovementX += Math.abs(currentX - startX);
         totalMovementY += Math.abs(currentY - startY);
         
-        // 速度履歴を記録
+        // 速度履歴を記録（より頻繁に記録）
         velocityHistory.push({x: currentX, time: currentTime});
         if (velocityHistory.length > velocityHistoryLength) {
           velocityHistory.shift();
@@ -830,7 +834,6 @@
       border-radius: 50%;
       display: flex;
       align-items: center;
-      justify-content: center;
       font-size: 16px;
       font-weight: bold;
       touch-action: manipulation;
