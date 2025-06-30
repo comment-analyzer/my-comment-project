@@ -67,10 +67,23 @@
     let isTooltipEnabled = true;
     let tooltipHideTimeout = null;
 
+    // 慣性スクロール用変数
+    let inertiaAnimationId = null;
+    let lastTouchTime = 0;
+    let touchVelocity = 0;
+    let velocityTracker = [];
+    let isInertiaScrolling = false;
+
     // ダブルタップ/ダブルクリック検出用
     let lastTapTime = 0;
     let lastClickTime = 0;
     const doubleTapDelay = 300; // ダブルタップ検出の時間間隔
+
+    // 慣性スクロールのパラメータ
+    const VELOCITY_SAMPLES = 5; // 速度計算に使用するサンプル数
+    const FRICTION = 0.95; // 摩擦係数（0.9-0.98の間）
+    const MIN_VELOCITY = 0.5; // 最小速度（これ以下で停止）
+    const MAX_VELOCITY = 100; // 最大速度（制限）
 
     // ツールチップの表示制御
     function disableTooltip() {
@@ -92,6 +105,93 @@
       tooltipHideTimeout = setTimeout(() => {
         isTooltipEnabled = true;
       }, delay);
+    }
+
+    // 慣性スクロールを停止
+    function stopInertiaScroll() {
+      if (inertiaAnimationId) {
+        cancelAnimationFrame(inertiaAnimationId);
+        inertiaAnimationId = null;
+      }
+      isInertiaScrolling = false;
+    }
+
+    // 速度を追跡
+    function trackVelocity(deltaX, deltaTime) {
+      if (deltaTime <= 0) return;
+      
+      const velocity = deltaX / deltaTime;
+      velocityTracker.push(velocity);
+      
+      // 最新のサンプル数のみ保持
+      if (velocityTracker.length > VELOCITY_SAMPLES) {
+        velocityTracker.shift();
+      }
+    }
+
+    // 平均速度を計算
+    function getAverageVelocity() {
+      if (velocityTracker.length === 0) return 0;
+      
+      const sum = velocityTracker.reduce((acc, vel) => acc + vel, 0);
+      return sum / velocityTracker.length;
+    }
+
+    // 慣性スクロールのアニメーション
+    function animateInertiaScroll(velocity) {
+      if (!chart || Math.abs(velocity) < MIN_VELOCITY) {
+        stopInertiaScroll();
+        enableTooltipWithDelay(300);
+        return;
+      }
+
+      const xScale = chart.scales.x;
+      const currentMin = xScale.min || 0;
+      const currentMax = xScale.max || totalDuration;
+      const range = currentMax - currentMin;
+      
+      // 速度に基づいて時間シフトを計算
+      const timeShift = velocity * 0.3; // 調整係数
+      
+      const newMin = Math.max(0, currentMin + timeShift);
+      const newMax = Math.min(totalDuration, currentMax + timeShift);
+      
+      // 境界に達した場合は停止
+      if ((newMin <= 0 && velocity < 0) || (newMax >= totalDuration && velocity > 0)) {
+        stopInertiaScroll();
+        enableTooltipWithDelay(300);
+        return;
+      }
+      
+      chart.options.scales.x.min = newMin;
+      chart.options.scales.x.max = newMax;
+      chart.update('none');
+      updateTimeInfo();
+      
+      // 摩擦を適用
+      const newVelocity = velocity * FRICTION;
+      
+      inertiaAnimationId = requestAnimationFrame(() => {
+        animateInertiaScroll(newVelocity);
+      });
+    }
+
+    // 慣性スクロールを開始
+    function startInertiaScroll() {
+      const avgVelocity = getAverageVelocity();
+      
+      // 速度が十分でない場合は慣性スクロールしない
+      if (Math.abs(avgVelocity) < MIN_VELOCITY * 2) {
+        enableTooltipWithDelay(300);
+        return;
+      }
+      
+      // 速度を制限
+      const clampedVelocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, avgVelocity));
+      
+      isInertiaScrolling = true;
+      disableTooltip();
+      animateInertiaScroll(clampedVelocity);
     }
 
     // デバイス判定
@@ -170,7 +270,7 @@
 
     // ダブルタップ/ダブルクリック処理
     function handleDoubleAction() {
-      if (isDragging || isScrolling) {
+      if (isDragging || isScrolling || isInertiaScrolling) {
         return;
       }
       
@@ -183,6 +283,8 @@
     // ズーム・パン操作
     function zoomIn() {
       if (!chart) return;
+      stopInertiaScroll(); // 慣性スクロールを停止
+      
       const xScale = chart.scales.x;
       const currentMin = xScale.min || 0;
       const currentMax = xScale.max || totalDuration;
@@ -198,6 +300,8 @@
 
     function zoomOut() {
       if (!chart) return;
+      stopInertiaScroll(); // 慣性スクロールを停止
+      
       const xScale = chart.scales.x;
       const currentMin = xScale.min || 0;
       const currentMax = xScale.max || totalDuration;
@@ -213,6 +317,8 @@
 
     function resetZoom() {
       if (!chart) return;
+      stopInertiaScroll(); // 慣性スクロールを停止
+      
       chart.options.scales.x.min = 0;
       chart.options.scales.x.max = Math.min(1800, totalDuration);
       chart.update('none');
@@ -221,6 +327,8 @@
 
     function showAll() {
       if (!chart) return;
+      stopInertiaScroll(); // 慣性スクロールを停止
+      
       chart.options.scales.x.min = 0;
       chart.options.scales.x.max = totalDuration;
       chart.update('none');
@@ -291,7 +399,7 @@
       }, { passive: false });
     }
 
-    // タッチハンドリング（スマホ用）
+    // タッチハンドリング（スマホ用） - 慣性スクロール対応
     function setupTouchHandling() {
       if (!isTouchDevice) return;
       
@@ -301,19 +409,26 @@
       let startY = 0;
       let startTime = 0;
       let lastX = 0;
+      let lastTime = 0;
       let totalMovementX = 0;
       let totalMovementY = 0;
       
       canvas.addEventListener('touchstart', function(e) {
+        // 慣性スクロール中の場合は停止
+        stopInertiaScroll();
+        
         const touch = e.touches[0];
         startX = lastX = touch.clientX;
         startY = touch.clientY;
-        startTime = Date.now();
+        startTime = lastTime = Date.now();
         totalMovementX = 0;
         totalMovementY = 0;
         hasMoved = false;
         isDragging = false;
         isScrolling = false;
+        
+        // 速度トラッカーをリセット
+        velocityTracker = [];
         
         e.preventDefault();
       }, { passive: false });
@@ -322,8 +437,11 @@
         const touch = e.touches[0];
         const currentX = touch.clientX;
         const currentY = touch.clientY;
+        const currentTime = Date.now();
         
         const deltaX = currentX - lastX;
+        const deltaTime = currentTime - lastTime;
+        
         totalMovementX += Math.abs(currentX - startX);
         totalMovementY += Math.abs(currentY - startY);
         
@@ -335,6 +453,9 @@
           
           // スクロール開始時にツールチップを無効化
           disableTooltip();
+          
+          // 速度を追跡
+          trackVelocity(deltaX, deltaTime);
           
           if (chart && chart.scales.x) {
             const xScale = chart.scales.x;
@@ -362,6 +483,7 @@
         }
         
         lastX = currentX;
+        lastTime = currentTime;
         e.preventDefault();
       }, { passive: false });
       
@@ -389,18 +511,23 @@
             // シングルタップ
             lastTapTime = currentTime;
           }
+        } else if (isDragging || isScrolling) {
+          // スクロールが発生していた場合、慣性スクロールを開始
+          startInertiaScroll();
         }
         
-        // スクロール終了時にツールチップを再有効化（少し遅延）
-        if (isDragging || isScrolling) {
+        // スクロール終了時にツールチップを再有効化（慣性スクロールがない場合のみ）
+        if (!isInertiaScrolling && (isDragging || isScrolling)) {
           enableTooltipWithDelay(500);
         }
         
         // 状態をリセット
         setTimeout(() => {
-          isDragging = false;
-          isScrolling = false;
-          hasMoved = false;
+          if (!isInertiaScrolling) {
+            isDragging = false;
+            isScrolling = false;
+            hasMoved = false;
+          }
         }, 100);
         
         e.preventDefault();
@@ -414,7 +541,7 @@
       const canvas = document.getElementById('commentChart');
       
       canvas.addEventListener('click', function(e) {
-        if (isDragging || isScrolling) {
+        if (isDragging || isScrolling || isInertiaScrolling) {
           return;
         }
         
@@ -524,6 +651,7 @@
                 mode: 'x',
                 modifierKey: null,
                 onPanStart: () => {
+                  stopInertiaScroll(); // 慣性スクロールを停止
                   disableTooltip();
                 },
                 onPanComplete: () => {
@@ -541,6 +669,7 @@
                 },
                 mode: 'x',
                 onZoomStart: () => {
+                  stopInertiaScroll(); // 慣性スクロールを停止
                   disableTooltip();
                 },
                 onZoomComplete: () => {
@@ -571,7 +700,7 @@
               cornerRadius: 6,
               displayColors: false,
               filter: function(tooltipItem) {
-                return isTooltipEnabled && !isDragging && !isScrolling;
+                return isTooltipEnabled && !isDragging && !isScrolling && !isInertiaScrolling;
               },
               callbacks: {
                 title: (context) => `時間: ${formatTime(context[0].parsed.x)}`,
