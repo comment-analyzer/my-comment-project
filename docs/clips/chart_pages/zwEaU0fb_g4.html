@@ -74,7 +74,7 @@
     let inertiaAnimationId = null;
     let velocityHistory = [];
     const velocityHistoryLength = 8; // 履歴を長くして精度向上
-    const frictionDeceleration = 0.98; // 摩擦を小さくして慣性を強化
+    const frictionDeceleration = 0.5; // 摩擦を小さくして慣性を強化
     const minVelocity = 0.3; // 最小速度を下げて長く続くように
     const inertiaMultiplier = 3.0; // 慣性の強さを大幅に増加
 
@@ -171,7 +171,7 @@
       }
       
       // 速度計算の符号を修正（右スワイプで時間が進む方向に）
-      velocityX = -calculateVelocity(); // 符号を反転
+      velocityX = calculateVelocity(); // 符号を反転
       
       // 最小速度の閾値を下げる
       if (Math.abs(velocityX) > 1) { // 閾値を下げて小さな動きでも慣性が働くように
