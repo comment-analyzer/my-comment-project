@@ -1,3 +1,4 @@
+
 /* Player Overlay: 背景を覆う半透明のレイヤー */
 .player-overlay {
   position: fixed;
@@ -11,19 +12,22 @@
   display: none; /* 初期状態では非表示 */
   opacity: 0;
   transition: opacity 0.3s ease-in-out;
+  /* flexboxプロパティを再度追加 */
+  display: flex; /* showクラスでflexに切り替えるため、初期はnone */
+  justify-content: center;
+  align-items: flex-start; /* 上部に配置 */
 }
 
 /* Player Container: 埋め込みプレイヤーと閉じるボタンを格納 */
 .player-container {
-  position: absolute; /* オーバーレイ内で絶対配置 */
-  top: 0; /* 上端に配置 */
-  left: 50%; /* 水平方向の中央 */
-  transform: translate(-50%, -100%); /* 初期位置は画面外上部、中央揃え */
+  position: relative; /* オーバーレイ内で相対配置 */
   width: 90%;
   max-width: 800px; /* 最大幅 */
+  margin-top: 3vh; /* ビューポートの高さに対する相対値 */
   background-color: #000;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transform: translateY(-150%); /* 初期位置は画面外上部、より確実に */
   transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* スライドアニメーション */
   overflow: hidden;
 }
@@ -72,15 +76,15 @@
 
 /* 表示時のスタイル */
 .player-overlay.show {
-  display: block; /* flexからblockに変更 */
+  display: flex; /* showクラスでflexに切り替え */
   opacity: 1;
 }
 
 .player-overlay.show .player-container {
-  transform: translate(-50%, 3%); /* 画面中央から3%下にスライド */
+  transform: translateY(0); /* 画面内にスライド */
 }
 
 /* ページ全体のスクロールを禁止するクラス */
 .no-scroll {
-  overflow: hidden;
+  overflow: hidden !important;
 }
