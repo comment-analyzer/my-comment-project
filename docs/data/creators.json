@@ -7,7 +7,8 @@
     "max_comments_per_hour": 25358,
     "video_count": 15,
     "last_updated": "2025-06-24",
-    "creator_page": "usada_pekora.html"
+    "creator_page": "usada_pekora.html",
+    "icon_url": "../static/images/creators/usada_pekora.png"
   },
   {
     "name": "Okayu Ch. 猫又おかゆ",
@@ -17,7 +18,8 @@
     "max_comments_per_hour": 15788,
     "video_count": 5,
     "last_updated": "2025-06-24",
-    "creator_page": "nekomata_okayu.html"
+    "creator_page": "nekomata_okayu.html",
+    "icon_url": "../static/images/creators/nekomata_okayu.png"
   },
   {
     "name": "Korone Ch. 戌神ころね",
@@ -27,7 +29,8 @@
     "max_comments_per_hour": 17184,
     "video_count": 5,
     "last_updated": "2025-06-24",
-    "creator_page": "inugami_korone.html"
+    "creator_page": "inugami_korone.html",
+    "icon_url": "../static/images/creators/inugami_korone.png"
   },
   {
     "name": "Miko Ch. さくらみこ",
@@ -37,7 +40,8 @@
     "max_comments_per_hour": 28547,
     "video_count": 9,
     "last_updated": "2025-06-24",
-    "creator_page": "sakura_miko.html"
+    "creator_page": "sakura_miko.html",
+    "icon_url": "../static/images/creators/sakura_miko.png"
   },
   {
     "name": "Subaru Ch. 大空スバル",
@@ -47,7 +51,8 @@
     "max_comments_per_hour": 25538,
     "video_count": 6,
     "last_updated": "2025-06-25",
-    "creator_page": "ozora_subaru.html"
+    "creator_page": "ozora_subaru.html",
+    "icon_url": "../static/images/creators/ozora_subaru.png"
   },
   {
     "name": "Laplus ch. ラプラス・ダークネス - holoX -",
@@ -57,7 +62,8 @@
     "max_comments_per_hour": 27948,
     "video_count": 2,
     "last_updated": "2025-06-25",
-    "creator_page": "lapus_darkness.html"
+    "creator_page": "lapus_darkness.html",
+    "icon_url": "../static/images/creators/lapus_darkness.png"
   },
   {
     "name": "フブキCh。白上フブキ",
@@ -67,17 +73,19 @@
     "max_comments_per_hour": 16361,
     "video_count": 4,
     "last_updated": "2025-06-25",
-    "creator_page": "shirakami_fubuki.html"
+    "creator_page": "shirakami_fubuki.html",
+    "icon_url": "../static/images/creators/shirakami_fubuki.png"
   },
   {
     "name": "栞葉るり / Shioriha Ruri【にじさんじ】",
     "group": "にじさんじ",
-    "average_comments_per_hour": 6774,
+    "average_comments_per_hour": 8118,
     "max_comments_per_10s": 169,
     "max_comments_per_hour": 10061,
     "video_count": 9,
     "last_updated": "2025-06-26",
-    "creator_page": "shioriha_ruri.html"
+    "creator_page": "shioriha_ruri.html",
+    "icon_url": "../static/images/creators/shioriha_ruri.png"
   },
   {
     "name": "Kuzuha Channel",
@@ -87,7 +95,8 @@
     "max_comments_per_hour": 39477,
     "video_count": 3,
     "last_updated": "2025-06-26",
-    "creator_page": "kuzuha.html"
+    "creator_page": "kuzuha.html",
+    "icon_url": "../static/images/creators/kuzuha.png"
   },
   {
     "name": "本間ひまわり - Himawari Honma -",
@@ -97,7 +106,8 @@
     "max_comments_per_hour": 2797,
     "video_count": 5,
     "last_updated": "2025-06-27",
-    "creator_page": "honma_himawari.html"
+    "creator_page": "honma_himawari.html",
+    "icon_url": "../static/images/creators/honma_himawari.png"
   },
   {
     "name": "アンジュ・カトリーナ - Ange Katrina -",
@@ -107,6 +117,7 @@
     "max_comments_per_hour": 7973,
     "video_count": 4,
     "last_updated": "2025-06-27",
-    "creator_page": "ange_katrina.html"
+    "creator_page": "ange_katrina.html",
+    "icon_url": "../static/images/creators/ange_katrina.png"
   }
 ]
