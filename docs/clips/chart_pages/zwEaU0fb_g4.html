@@ -9,8 +9,17 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
   
+  <link rel="stylesheet" href="./static/style/player.css">
 </head>
 <body>
+  <!-- Embedded Player -->
+  <div id="player-overlay" class="player-overlay">
+    <div id="player-container" class="player-container">
+      <button id="close-player" class="close-player-btn">&times;</button>
+      <div id="youtube-player-iframe"></div>
+    </div>
+  </div>
+
   <div class="header">📊 コメント数の推移</div>
   
   <div id="chart-container">
@@ -1066,5 +1075,6 @@
       }
     }
   </style>
+  <script src="./static/js/player.js"></script>
 </body>
 </html>
